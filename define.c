@@ -113,7 +113,8 @@ uint8_t cal_seq(protocolo *msg)
 	return (new_seq);
 }
 
-protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam) {
+protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam) 
+{
     protocolo *msg = (protocolo *)malloc(sizeof(protocolo));
     if (!msg) {
         return NULL;

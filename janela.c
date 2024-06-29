@@ -5,6 +5,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #define VIDEO_DIR "/home/diegaum/Redes/code/videos" // Caminho absoluto do diretório
+#define MAX_SEQ_HISTORY 65
+int seq_history[MAX_SEQ_HISTORY];
+int seq_index = 0;
 
 // Caso que o cliente manda uma mensagem do tipo lista "01010"
 // Servidor pode responder com ACK , NACK, MOSTRA_TELA ou ERRO
@@ -50,40 +53,6 @@ void envia_mensagem_com_janela(int socket, protocolo *msg, janela_deslizante *ja
     janela->next_seq++;
 }
 
-// Função que desliza a janela deslizante
-void slide_janela(janela_deslizante *janela) 
-{
-    // Incrementa a base da janela
-    janela->base++;
-
-    // Libera a memória da mensagem na base da janela
-    exclui_msg(janela->buffer[janela->base % MAX_JANELA]);
-
-    // Atualiza a mensagem na base da janela para NULL
-    janela->buffer[janela->base % MAX_JANELA] = NULL;
-}
-
-//  Recebe confirmações (ACK ou NACK) do servidor e processa de acordo, deslizando a janela conforme necessário
-void processa_confirmacao_janela(int socket, janela_deslizante *janela) 
-{
-    protocolo *msg_recebida = recebe_msg(socket, 1);
-    if (!msg_recebida) {
-        fprintf(stderr, "Erro ao receber mensagem de confirmação.\n");
-        return;
-    }
-    uint8_t tipo_msg = ler_msg(msg_recebida);
-    if (tipo_msg == ACK) {
-        uint8_t ack = msg_recebida->dados[0];
-        while (janela->base <= ack) {
-            slide_janela(janela);
-        }
-    } else if (tipo_msg == NACK) {
-        uint8_t nack = msg_recebida->dados[0];
-        envia_msg(socket, janela->buffer[nack % MAX_JANELA]);
-    }
-    exclui_msg(msg_recebida);
-}
-
 // Função que envia uma mensagem de ACK
 void envia_ack(int socket, uint8_t seq) 
 {
@@ -111,27 +80,53 @@ void envia_erro(int socket, uint8_t seq)
     exclui_msg(erro_msg);
 }
 
-// Função que recebe a lista de videos disponíveis enviada pelo servidor
+int ja_processada(int seq) 
+{
+    for (int i = 0; i < MAX_SEQ_HISTORY; i++) {
+        if (seq_history[i] == seq) {
+            return 1; // Já processada
+        }
+    }
+    return 0; // Não processada
+}
+
+void marca_como_processada(int seq) 
+{
+    seq_history[seq_index] = seq;
+    seq_index = (seq_index + 1) % MAX_SEQ_HISTORY;
+}
+
+// Modifique a função recebe_lista
 void recebe_lista(int socket) 
 {
     protocolo *resposta;
-    resposta = recebe_msg(socket, 1);
-    printf("Dentro da funcao recebe_lista\n");
-    printf("Tipo da mensagem recebida: %d\n", resposta->tipo);
-    printf("\n");
-    if (resposta) 
-    {
-        printf("Tipo da mensagem recebida: %d\n", resposta->tipo);
-        if (resposta->tipo == MOSTRA_TELA) {
-            printf("Lista de vídeos disponíveis:\n%s\n", resposta->dados);
+    while (1) {
+        resposta = recebe_msg(socket, 1);
+        if (resposta) 
+        {
+            printf("Dentro da funcao recebe_lista\n");
+            printf("Tipo da mensagem recebida: %d\n", resposta->tipo);
+            printf("Sequência da mensagem recebida: %d\n", resposta->seq);
+            printf("Dados da mensagem recebida: %s\n", resposta->dados);
+            printf("\n");
+
+            if (resposta->tipo == MOSTRA_TELA && !ja_processada(resposta->seq)) {
+                printf("Lista de vídeos disponíveis:\n%s\n", resposta->dados);
+                marca_como_processada(resposta->seq);
+                exclui_msg(resposta);
+                break;
+            } else {
+                printf("Erro: Tipo de mensagem inesperado ou duplicado\n");
+            }
+            exclui_msg(resposta);
         } else {
-            printf("Erro: Tipo de mensagem inesperado\n");
+            printf("Erro ao receber lista de vídeos\n");
+            break;
         }
-        exclui_msg(resposta);
-    } else {
-        printf("Erro ao receber lista de vídeos\n");
     }
 }
+
+
 
 // Funcao que abre um video
 void abre_video(const char *filename) 
@@ -147,6 +142,7 @@ void baixa_arquivo(int socket, const char *filename, janela_deslizante *janela)
 {
     protocolo *msg = cria_msg(janela->next_seq, BAIXAR, (uint8_t *)filename, strlen(filename));
     envia_mensagem_com_janela(socket, msg, janela);
+    imprime_msg(msg);
     exclui_msg(msg);
 
     FILE *arquivo = fopen(filename, "wb");
@@ -161,9 +157,11 @@ void baixa_arquivo(int socket, const char *filename, janela_deslizante *janela)
     while (!ftx_recebido) {
         resposta = recebe_msg(socket, 1);
         if (resposta) {
-            switch (resposta->tipo) {
+            switch (resposta->tipo) 
+            {
                 case DADOS:
                     fwrite(resposta->dados, 1, resposta->tam, arquivo);
+                    imprime_msg(resposta);
                     envia_ack(socket, resposta->seq);
                     break;
                 case FTX:
@@ -259,6 +257,7 @@ void cliente_manda_lista(int socket, janela_deslizante *janela)
     envia_mensagem_com_janela(socket, msg, janela);
     printf("Mensagem do tipo 'lista' enviada para o servidor.\n");
     printf("\n");
+    exclui_msg(msg);
 }
 
 // Função que envia uma mensagem de pedido de download de um arquivo
@@ -293,6 +292,7 @@ Documentação: Adicionar comentários e documentação para explicar o propósi
 // Cliente responde com ACK ou NACK ate o servidor
 
 // Funcao para listar arquivos de vídeo no diretório
+// Função para listar arquivos de vídeo no diretório
 void lista_arquivos(int socket) 
 {
     printf("Tentando abrir o diretório de vídeos: %s\n", VIDEO_DIR);
@@ -326,11 +326,14 @@ void lista_arquivos(int socket)
     // Enviar a lista de arquivos
     protocolo *lista_msg = cria_msg(0, MOSTRA_TELA, (uint8_t *)lista, strlen(lista));
     printf("Lista de arquivos disponíveis: %s\n", lista);
+    printf("Enviando mensagem MOSTRA_TELA...\n");
     envia_msg(socket, lista_msg);
     imprime_msg(lista_msg);
+    printf("Mensagem MOSTRA_TELA enviada.\n");
     printf("\n");
     free(lista_msg);
 }
+
 
 // Função para enviar um arquivo ao cliente
 void envia_arquivo(int socket, const char *filename) 
@@ -378,9 +381,11 @@ void envia_arquivo(int socket, const char *filename)
     free(ftx_msg);
 }
 
+// Encher como lixo se for usar menos de 63 bytes
 // Função para mandar os arquivos em partes
 void envia_partes_arquivo(int socket, uint8_t seq_inicial, const char *arquivo) 
 {
+    printf("Dentro da funcao envia_partes_arquivo\n");
     FILE *fp = fopen(arquivo, "rb");
     if (!fp) {
         fprintf(stderr, "Erro ao abrir o arquivo.\n");
@@ -394,8 +399,10 @@ void envia_partes_arquivo(int socket, uint8_t seq_inicial, const char *arquivo)
     int base = seq_inicial;
     int n_msgs_enviadas = 0;
 
-    while ((bytes_lidos = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
+    while ((bytes_lidos = fread(buffer, 1, sizeof(buffer), fp)) > 0) 
+    {
         protocolo *dados_msg = cria_msg(seq, DADOS, buffer, bytes_lidos);
+        imprime_msg(dados_msg);
         envia_msg(socket, dados_msg);
         exclui_msg(dados_msg);
         seq++;
