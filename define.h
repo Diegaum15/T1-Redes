@@ -57,7 +57,7 @@ typedef struct {
 #define TENTATIVA_MAX 16
 #define TEMPO_ESPERA 20
 /* ####   ERROS  ####*/
-#define ERRO_ACESSO 0x3E	//111111
+#define ERRO_ACESSO 0x3E	//111110
 
 #define ERRO_PARAM "Parametro Invalido - Execução Abortada"
 #define ERRO_NAO_ENCONTRADO "Video Nao Encontrado - Execução Abortada"

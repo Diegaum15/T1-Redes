@@ -20,56 +20,7 @@
 // Definições e implementações das estruturas e funções de protocolo
 #include "define.h"
 #include "janela.h"
-
-// Função para abrir um socket RAW
-int abrirRawSocket(char *interface) {
-    int rsocket;
-    struct packet_mreq mreq;
-    struct ifreq ifr;
-    struct sockaddr_ll local;
-
-    // Abrir o socket RAW
-    if ((rsocket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0) {
-        perror("Erro ao abrir socket RAW");
-        return -1;
-    }
-
-    memset(&ifr, 0, sizeof(ifr));
-    strcpy(ifr.ifr_name, interface);
-
-    // Obter o índice da interface
-    if (ioctl(rsocket, SIOCGIFINDEX, &ifr) < 0) {
-        perror("Erro ao obter índice da interface");
-        close(rsocket);
-        return -2;
-    }
-
-    // Configurar o endereço do socket
-    memset(&local, 0, sizeof(local));
-    local.sll_family = AF_PACKET;
-    local.sll_ifindex = ifr.ifr_ifindex;
-    local.sll_protocol = htons(ETH_P_ALL);
-
-    // Bind do socket à interface
-    if (bind(rsocket, (struct sockaddr *)&local, sizeof(local)) < 0) {
-        perror("Erro ao fazer bind do socket à interface");
-        close(rsocket);
-        return -3;
-    }
-
-    // Configurar o modo promíscuo
-    memset(&mreq, 0, sizeof(mreq));
-    mreq.mr_ifindex = ifr.ifr_ifindex;
-    mreq.mr_type = PACKET_MR_PROMISC;
-
-    if (setsockopt(rsocket, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-        perror("Erro ao configurar modo promíscuo");
-        close(rsocket);
-        return -4;
-    }
-
-    return rsocket;
-}
+#include "raw_socket.h"
 
 int main() 
 {
