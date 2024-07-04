@@ -7,11 +7,14 @@ void inicializa_janela(janela_deslizante *janela);
 // Envia uma mensagem com janela deslizante
 void envia_mensagem_com_janela(int socket, protocolo *msg, janela_deslizante *janela);
 
-// Desliza a janela
-void slide_janela(janela_deslizante *janela);
+// Desliza janela
+void desliza_janela(protocolo *buffer[MAX_JANELA]);
 
 // Processa confirmações do servidor
 void processa_confirmacao_janela(int socket, janela_deslizante *janela);
+
+// Função que envia um pedido de lista
+void envia_pedido_lista(int socket);
 
 // Envia uma mensagem com ack
 void envia_ack(int socket, uint8_t seq);
@@ -22,8 +25,8 @@ void envia_nack(int socket, uint8_t seq);
 // Envia uma mensagem de erro
 void envia_erro(int socket, uint8_t seq);
 
-// Função que recebe a lista de videos disponíveis enviada pelo servidor
-void recebe_lista(int socket);
+// Função que envia pedido e recebe lista de arquivos disponíveis no servidor
+void pede_e_recebe_lista(int socket);
 
 // Função que baixa um arquivo do servidor
 void baixa_arquivo(int socket, const char *filename, janela_deslizante *janela);
@@ -36,9 +39,6 @@ void processa_resposta_servidor(int socket, protocolo *msg, janela_deslizante *j
 
 // Função que responde ao servidor com ACK ou NACK
 void responde_servidor(int socket, protocolo *msg);
-
-// Função que envia uma mensagem de pedido de lista de arquivos
-void cliente_manda_lista(int socket, janela_deslizante *janela);
 
 // Função que envia uma mensagem de pedido de download de um arquivo
 void cliente_manda_baixar(int socket, const char *video, janela_deslizante *janela);
@@ -54,5 +54,8 @@ void envia_partes_arquivo(int socket, uint8_t seq_inicial, const char *arquivo);
 
 // Função que processa a mensagem do cliente
 void processa_mensagem_cliente(int socket, protocolo *msg);
+
+// Funcao que lida com o possiveis erros
+void cuidar_erro(protocolo *msg);
 
 #endif  // JANELA_H

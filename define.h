@@ -53,13 +53,12 @@ typedef struct {
     int tamanho;					 // Tamanho da janela
 } janela_deslizante;
 
-/* ######## TIMEOUT #######*/
-#define TENTATIVA_MAX 16
-#define TEMPO_ESPERA 20
 /* ####   ERROS  ####*/
 #define ERRO_ACESSO 0x3E	//111110
 
 #define ERRO_PARAM "Parametro Invalido - Execução Abortada"
+#define ERRO_ACESSO_NEGADO "Acesso Negado - Execução Abortada"
+#define ERRO_PADRAO "Erro - Execução Abortada"
 #define ERRO_NAO_ENCONTRADO "Video Nao Encontrado - Execução Abortada"
 #define ERRO_DISCO_CHEIO "Disco esta cheio - Execução Abortada"
 
@@ -76,7 +75,7 @@ typedef struct {
 #define LISTA 0x0A		  		//"01010"  10
 #define BAIXAR 0x0B		  		//"01011"  11
 #define MOSTRA_TELA 0x10  		//"10000"  12
-#define DESCRITOR_ARQUIVO 0x0D  //"10001"  13
+#define DESCRITOR_ARQUIVO 0x11  //"10001"  13
 #define DADOS 0x12		        //"10010"  18
 #define FTX 0x1E		   		//"11110"  30
 #define ERRO 0x1F		   		//"11111"  31
@@ -114,6 +113,10 @@ uint8_t cal_seq(protocolo *msg);
 // Função para criar uma mensagem
 protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam);
 
+//espera resposta retorna 0 se receber antes de timeout, se nao retorna 1
+//se timeout for NULL, espera indeterminadamente
+int espera(int socket, int timeout);
+
 // Função para enviar uma mensagem
 void envia_msg(int socket,protocolo *msg);
 
@@ -131,5 +134,8 @@ void d_erro(uint8_t *codigo);
 
 // Função para imprimir uma mensagem
 void imprime_msg(protocolo *msg);
+
+//preenche dados com 1s
+void padding_dados(uint8_t *dados, int tam);
 
 #endif  // DEFINE_H

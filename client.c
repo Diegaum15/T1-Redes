@@ -19,8 +19,7 @@ void interface_cliente(int socket, janela_deslizante *janela)
 
         switch (escolha) {
             case 1:
-                cliente_manda_lista(socket, janela);
-                recebe_lista(socket);
+                pede_e_recebe_lista(socket);
                 break;
             case 2:
                 printf("Digite o nome do vídeo a ser baixado: ");
@@ -74,7 +73,7 @@ int main()
     janela_deslizante janela;
     inicializa_janela(&janela);
 
-    cliente_manda_lista(rsocket, &janela);
+    cliente_pede_lista(rsocket, &janela);
 
     while (1) {
         protocolo *msg = recebe_msg(rsocket, 1);
@@ -111,7 +110,7 @@ int main() {
     inicializa_janela(&janela);
     printf("Janela deslizante inicializada.\n");
 
-    cliente_manda_lista(rsocket, &janela);
+    cliente_pede_lista(rsocket, &janela);
 
     protocolo *msg_recebida;
     while ((msg_recebida = recebe_msg(rsocket, 1)) != NULL) 

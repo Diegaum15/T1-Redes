@@ -116,92 +116,54 @@ uint8_t cal_seq(protocolo *msg)
 protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam) 
 {
     protocolo *msg = (protocolo *)malloc(sizeof(protocolo));
-    if (!msg) {
+    if (!msg)
         return NULL;
-    }
 
-    msg->inicio = 126;
+    msg->inicio = PACKET_START_MARKER;
     msg->tam = tam;
     msg->seq = seq;
     msg->tipo = tipo;
-    msg->dados = NULL;
-
-    if (tam > 0 && dados != NULL) {
-        msg->dados = (uint8_t *)malloc(tam);
-        if (!msg->dados) {
-            free(msg);
-            return NULL;
-        }
-        memcpy(msg->dados, dados, tam);
+    msg->dados = (uint8_t *)malloc(64);
+    if (!msg->dados) {
+        free(msg);
+        return NULL;
     }
+
+    if (tam > 0) 
+        memcpy(msg->dados, dados, tam);
+    padding_dados(msg->dados, tam);
 
     msg->crc = calc_crc8(msg);
     return msg;
 }
 
-void timeout(int socket, protocolo *msg) 
-{
-    fd_set readset;
+int espera(int socket, int timeout){
+    fd_set readfds;
     struct timeval tv;
-    int i = 0;
-    int result;
+    tv.tv_sec = timeout;
+    tv.tv_usec = 0;
 
-    while (i < TENTATIVA_MAX) {
-        tv.tv_sec = TEMPO_ESPERA;
-        tv.tv_usec = 0;
+    FD_ZERO(&readfds);
+    FD_SET(socket, &readfds);
 
-        FD_ZERO(&readset);
-        FD_SET(socket, &readset);
-
-        result = select(socket + 1, &readset, NULL, NULL, &tv);
-
-        if (result <= 0) { // Timeout
-            printf("TIMEOUT - Tentativa %d\n", i + 1);
-            envia_msg(socket, msg);
-            i++;
-        } else if (FD_ISSET(socket, &readset)) {
-            // Recebeu resposta, sair do loop
-            break;
-        }
+    //se for maior que 1023 select não funciona
+    if (socket >= 1024){
+        printf("ERRO - limite de socket eh 1024\n");
+        return 1;
     }
 
-    if (i == TENTATIVA_MAX) {
-        printf("ERRO - Timeout máximo atingido. Abortando operação!\n");
-        exit(0);
-    }
-}
+    //monitora fd(no caso socket)
+    int ret;
+    if (timeout == NULL)
+        ret = select(socket+1, &readfds, NULL, NULL, NULL);
+    else
+        ret = select(socket+1, &readfds, NULL, NULL, &tv);
 
-void timeout_dados(int socket, protocolo *msg1, protocolo *msg2) 
-{
-    fd_set readset;
-    struct timeval tv;
-    int i = 0;
-    int result;
-
-    while (i < TENTATIVA_MAX) {
-        tv.tv_sec = TEMPO_ESPERA;
-        tv.tv_usec = 0;
-
-        FD_ZERO(&readset);
-        FD_SET(socket, &readset);
-
-        result = select(socket + 1, &readset, NULL, NULL, &tv);
-
-        if (result <= 0) { // Timeout
-            printf("TIMEOUT - Tentativa %d\n", i + 1);
-            envia_msg(socket, msg1);
-            envia_msg(socket, msg2);
-            i++;
-        } else if (FD_ISSET(socket, &readset)) {
-            // Recebeu resposta, sair do loop
-            break;
-        }
-    }
-
-    if (i == TENTATIVA_MAX) {
-        printf("ERRO - Timeout máximo atingido. Abortando operação!\n");
-        exit(0);
-    }
+    //testa se recebeu algo
+    if (ret && FD_ISSET(socket, &readfds))
+        return 0;
+    else
+        return 1;
 }
 
 void envia_msg(int socket,protocolo *msg)
@@ -241,6 +203,19 @@ void envia_msg(int socket,protocolo *msg)
 		fprintf(stderr,"ERRO - Enviar MSG Vazia");
 	}
 }
+
+
+
+
+
+
+//MUDAR A IMPLEMENTAÇÃO DO CRC, calcular em cima com o crc recebido e comparar com 0
+
+
+// n_msgs??
+
+
+
 
 protocolo* recebe_msg(int socket,int n_msgs)
 {
@@ -374,6 +349,14 @@ void imprime_msg(protocolo *msg)
         printf("\n");
 	}
 }
+
+//preenche o resto de dados(de tam até 64) com 1s
+void padding_dados(uint8_t *dados, int tam){
+    for (int i = tam; i < 64; i++) {
+        dados[i] = 0xFF;
+    }
+}
+
 /*
     Sugestoes de melhorias: 
 
