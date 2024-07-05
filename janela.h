@@ -8,22 +8,10 @@ void inicializa_janela(janela_deslizante *janela);
 void envia_mensagem_com_janela(int socket, protocolo *msg, janela_deslizante *janela);
 
 // Desliza janela
-void desliza_janela(protocolo *buffer[MAX_JANELA]);
+void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next);
 
 // Processa confirmações do servidor
 void processa_confirmacao_janela(int socket, janela_deslizante *janela);
-
-// Função que envia um pedido de lista
-void envia_pedido_lista(int socket);
-
-// Envia uma mensagem com ack
-void envia_ack(int socket, uint8_t seq);
-
-// Envia uma mensagem com nack
-void envia_nack(int socket, uint8_t seq);
-
-// Envia uma mensagem de erro
-void envia_erro(int socket, uint8_t seq);
 
 // Função que envia pedido e recebe lista de arquivos disponíveis no servidor
 void pede_e_recebe_lista(int socket);

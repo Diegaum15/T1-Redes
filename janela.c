@@ -1,5 +1,6 @@
 #include "define.h"
 #include "janela.h"
+#include "protocolo.h"
 #include <linux/if_packet.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -52,50 +53,20 @@ void envia_mensagem_com_janela(int socket, protocolo *msg, janela_deslizante *ja
     janela->next_seq++;
 }
 
-void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next){
+void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next)
+{
     for (int i = 0; i < MAX_JANELA-1; i++){
         janela[0] = janela[1];
     }
     janela[MAX_JANELA] = next;
 }
 
-// Função que envia um pedido de lista
-void envia_pedido_lista(int socket) 
-{
-    protocolo *lista_msg = cria_msg(0, LISTA, NULL, 0);
-    envia_msg(socket, lista_msg);
-    exclui_msg(lista_msg);
-}
-
-// Função que envia uma mensagem de ACK
-void envia_ack(int socket, uint8_t seq) 
-{
-    protocolo *ack_msg = cria_msg(seq, ACK, NULL, 0);
-    envia_msg(socket, ack_msg);
-    exclui_msg(ack_msg);
-}
-
-// Função que envia uma mensagem NACK 
-void envia_nack(int socket, uint8_t seq) 
-{
-    protocolo *nack_msg = cria_msg(seq, NACK, NULL, 0);
-    envia_msg(socket, nack_msg);
-    exclui_msg(nack_msg);
-}
-
-// Função que envia uma mensagem de erro
-void envia_erro(int socket, uint8_t seq) 
-{
-    protocolo *erro_msg = cria_msg(seq, ERRO, NULL, 0);
-    envia_msg(socket, erro_msg);
-    exclui_msg(erro_msg);
-}
-
 // Função que envia pedido e recebe lista de arquivos 
 void pede_e_recebe_lista(int socket) 
 {
     int tentativas = 0;
-    while (tentativas < 5){
+    while (tentativas < 5)
+    {
         //pede pela lista
         envia_pedido_lista(socket);
         printf("Mensagem do tipo 'pedido da lista' enviada para o servidor.\n");
@@ -118,12 +89,12 @@ void pede_e_recebe_lista(int socket)
                 if (resposta->tipo == ACK || resposta->tipo == MOSTRA_TELA){
                     int seq_esperado = 0;
                     if (resposta->tipo == ACK){
-                        espera(socket, NULL);
+                        espera(socket, -1);
                         resposta = recebe_msg(socket, 1);
                     }
   
                     protocolo *janela[MAX_JANELA];
-                    memset(janela, 0, MAX_JANELA);
+                    memset(janela, 0, MAX_JANELA * sizeof(protocolo*));
                     while (resposta->tipo != FTX){
                         int tamanho = resposta->tam;
                         char *listas;
@@ -145,7 +116,7 @@ void pede_e_recebe_lista(int socket)
                                 envia_nack(socket, seq_esperado);
                                 janela[resposta->seq - seq_esperado] = resposta;
                             }
-                            espera(socket, NULL);
+                            espera(socket, -1);
                             resposta = recebe_msg(socket, 1);
                             }
                     }
@@ -329,7 +300,6 @@ Documentação: Adicionar comentários e documentação para explicar o propósi
 // Cliente responde com ACK, NACK ou ERRO ate o servidor mandar os DADOS
 // Cliente responde com ACK ou NACK ate o servidor
 
-// Funcao para listar arquivos de vídeo no diretório
 // Função para listar arquivos de vídeo no diretório
 void lista_arquivos(int socket) 
 {
