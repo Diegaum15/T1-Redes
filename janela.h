@@ -7,7 +7,7 @@ void inicializa_janela(janela_deslizante *janela);
 // Envia uma mensagem com janela deslizante
 void envia_mensagem_com_janela(int socket, protocolo *msg, janela_deslizante *janela);
 
-// Desliza janela
+// Desliza uma janela, passa quem sera o ultimo da janela
 void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next);
 
 // Processa confirmações do servidor
