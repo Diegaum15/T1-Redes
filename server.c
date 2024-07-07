@@ -21,6 +21,7 @@
 #include "define.h"
 #include "janela.h"
 #include "raw_socket.h"
+#include "protocolo.h"
 
 int main() 
 {
@@ -47,6 +48,8 @@ int main()
     close(rsocket);
     return 0;
 }
+
+
 
 /* Programa que testou a comunicacao entre cliente e servidor por go-back-n
 int main() 

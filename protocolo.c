@@ -18,7 +18,8 @@ uint8_t* aloca_vetor(int tam)
         fprintf(stderr, "Falha ao alocar vetor de uint8_t - Dados ou buffer\n");
         exit(-1);
     }
-    dados[tam] = '\0'; // Adicionar terminador nulo no final dos dados
+    //dados[tam] = '\0'; // Adicionar terminador nulo no final dos dados
+    memset(dados, 0, tam + 1); // Inicializa o vetor alocado com zeros
     return dados;
 }
 
@@ -67,9 +68,10 @@ protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam)
         memcpy(msg->dados, dados, tam);
     padding_dados(msg->dados, tam);
 
-    msg->crc = calc_crc8(msg);
+    msg->crc = 0;
     return msg;
 }
+
 
 int espera(int socket, int timeout){
     fd_set readfds;
@@ -150,13 +152,27 @@ protocolo* recebe_msg(int socket,int n_msgs)
 	
 	//4bytes fixo + 63 bytes dados max
 	tam_buffer = 67;
-	//aloca buffer
-	buffer = aloca_vetor(tam_buffer);
-	//aloca msg
-	msg = aloca_msg();
-	//recebe msg e salva no buffer
-	//read(socket,buffer,tam_buffer);
+	
+    buffer = (uint8_t*)malloc(tam_buffer);
+    if (!buffer) {
+        fprintf(stderr, "Falha ao alocar buffer\n");
+        exit(-1);
+    }
+
+    msg = (protocolo*)malloc(sizeof(protocolo));
+    if (!msg) {
+        fprintf(stderr, "Falha ao alocar mensagem\n");
+        free(buffer);
+        exit(-1);
+    }
+
     int bytes_read = read(socket, buffer, tam_buffer);
+    if (bytes_read <= 0) {
+        free(buffer);
+        free(msg);
+        return NULL;
+    }
+
 	if(buffer[0] == PACKET_START_MARKER)
     {
 		//inicio
@@ -186,22 +202,17 @@ protocolo* recebe_msg(int socket,int n_msgs)
             fprintf(stderr, "ERRO: CRC inválido na mensagem recebida.\n");
             free(msg->dados);
             free(msg);
+            free(buffer);
             return NULL; // Retorna NULL em caso de CRC inválido
         }
 
-        /*
-        if (msg->crc != calc_crc8(msg)) {
-            printf("ERRO - CRC Incorreto\n");
-            return NULL;
-        }
-        */
-
 		//libera BUFFER
 		free(buffer);
-        //printf("Mensagem recebida: inicio=%d, tam=%d, seq=%d, tipo=%d, crc=%d\n", msg->inicio, msg->tam, msg->seq, msg->tipo, msg->crc);
 		return (msg);
 	}else{
 		//lixo
+        free(buffer);
+        free(msg);
 		return(NULL);
 	}
 }
@@ -275,13 +286,22 @@ void imprime_msg(protocolo *msg)
 	}
 }
 
+/*
 //preenche o resto de dados(de tam até 64) com 1s
 void padding_dados(uint8_t *dados, int tam){
     for (int i = tam; i < 64; i++) {
         dados[i] = 0xFF;
     }
 }
+*/
 
+///*
+// Função de padding para inicializar os dados
+void padding_dados(uint8_t *dados, size_t tam) 
+{
+    memset(dados + tam, 0, 64 - tam); // Inicializa os bytes restantes com zero
+}
+//*/
 
 // Função que envia um pedido de lista
 void envia_pedido_lista(int socket) 

@@ -39,7 +39,8 @@ void d_erro(uint8_t *codigo);
 void imprime_msg(protocolo *msg);
 
 //preenche dados com 1s
-void padding_dados(uint8_t *dados, int tam);
+//void padding_dados(uint8_t *dados, int tam);
+void padding_dados(uint8_t *dados, size_t tam);
 
 // Função que envia um pedido de lista
 void envia_pedido_lista(int socket);

@@ -1,6 +1,7 @@
 #include "define.h"
 #include "raw_socket.h"
 #include "janela.h"
+#include "protocolo.h"
 #define SERVER_PORT 12347
 #define VIDEO_DIR "/home/diegaum/Redes/code/videos" // Caminho absoluto do diretório
 
@@ -24,7 +25,7 @@ void interface_cliente(int socket, janela_deslizante *janela)
             case 2:
                 printf("Digite o nome do vídeo a ser baixado: ");
                 scanf("%s", video);
-                cliente_manda_baixar(socket, video, janela);
+                //cliente_manda_baixar(socket, video, janela);
                 baixa_arquivo(socket, video, janela);
                 break;
             case 3:
@@ -36,6 +37,7 @@ void interface_cliente(int socket, janela_deslizante *janela)
     }
 }
 
+//wlp0s20f3
 
 int main() 
 {
@@ -57,6 +59,7 @@ int main()
     close(rsocket);
     return 0;
 }
+
 
 /* teste basico para ver a comunicacao do cliente com o servidor
 int main() 
@@ -204,32 +207,4 @@ int main() {
     return 0;
 }
 
-/* teste do envio de mensagem pelo socket
-int main() {
-    int sockfd;
-    struct sockaddr_ll server_addr;
-
-    // Abrir o socket RAW usando a interface 'lo'
-    char interface[] = "lo";
-    sockfd = cria_raw_socket(interface);
-    if (sockfd < 0) {
-        fprintf(stderr, "Erro ao abrir socket RAW.\n");
-        exit(1);
-    }
-
-    printf("Socket RAW aberto com sucesso na interface: %s\n", interface);
-
-    // Configuração do endereço do servidor
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sll_family = AF_PACKET;
-    server_addr.sll_protocol = htons(ETH_P_ALL);
-    server_addr.sll_ifindex = if_nametoindex(interface);
-
-    // Implemente aqui a lógica para enviar mensagens para o servidor
-
-    // Fechar o socket RAW
-    close(sockfd);
-
-    return 0;
-}
 */
