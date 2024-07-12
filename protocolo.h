@@ -17,7 +17,7 @@ uint8_t cal_seq(protocolo *msg);
 protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam);
 
 //espera resposta retorna 0 se receber antes de timeout, se nao retorna 1
-//se timeout for NULL, espera indeterminadamente
+//se timeout for -1, espera indeterminadamente
 int espera(int socket, int timeout);
 
 // Função para enviar uma mensagem

@@ -5,7 +5,6 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#define VIDEO_DIR "/home/diegaum/Redes/code/videos" // Caminho absoluto do diretório
 
 // Caso que o cliente manda uma mensagem do tipo lista "01010"
 // Servidor pode responder com ACK? , NACK, MOSTRA_TELA ou ERRO
@@ -31,7 +30,15 @@ void inicializa_janela(janela_deslizante *janela)
     }
 }
 
-// ARRUMAR - uso do modulo permite que buffer esteja com [5,6,2,3,4], deveria ser[2, 3, 4, 5, 6]
+void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next)
+{
+    for (int i = 0; i < MAX_JANELA-1; i++){
+        janela[0] = janela[1];
+    }
+    janela[MAX_JANELA] = next;
+}
+
+// Função que envia pedido e recebe lista de arquivos 
 void pede_e_recebe_lista(int socket) {
     int tentativas = 0;
     while (tentativas < 5) {
@@ -62,66 +69,74 @@ void pede_e_recebe_lista(int socket) {
                     protocolo *janela[MAX_JANELA];
                     memset(janela, 0, MAX_JANELA * sizeof(protocolo*));
                     char **lista = NULL;
-                    size_t lista_size = 0;
-
-                    while (resposta && resposta->tipo != FTX) {
-                        if (resposta->tipo == ERRO) {
+                    //enquanto nao acabar a transmissao
+                    while (resposta->tipo != FTX){
+                        if (resposta->tipo == ERRO)
                             cuidar_erro(resposta);
-                            exclui_msg(resposta);
-                            return;
-                        }
+                        //pacote recebido eh o esperado
+                        if (resposta->seq == seq_esperado){
 
-                        if (resposta->seq == seq_esperado) {
-                            janela[0] = resposta;
-                            int i = 1;
-                            while (i < MAX_JANELA && janela[i] != NULL) {
+                            //se janela ja possui pacotes para serem processados
+                            janela[0] = resposta; // 0 eh a resposta
+                            int i = 1; //quantidade de pacotes a processar
+                            while(i < MAX_JANELA && janela[i] != NULL){
+                                if (janela[i]->seq != seq_esperado+i) //teste janela do cliente
+                                    printf("ERRO NA JANELA DO CLIENTE\n\n");
                                 i++;
                             }
-
-                            lista_size += i;
-                            lista = realloc(lista, lista_size * sizeof(char*));
-
-                            for (int j = 0; j < i; j++) {
-                                lista[seq_esperado + j] = strdup((char*)janela[j]->dados);
+                            //guarda o(s) nome(s) recebido(s) em lista
+                            lista = realloc(lista, (seq_esperado+i) * sizeof(char*)); //aumenta a lista
+                            if (lista == NULL){
+                                    printf("Erro ao alocar lista de videos");
+                                    return;
+                                }
+                            for(int j = 0; j < i; j++){
+                                lista[seq_esperado+j] = strndup((char*)janela[j]->dados, janela[j]->tam);
+                                if (lista[seq_esperado+j] == NULL){
+                                    printf("Erro ao alocar lista de videos");
+                                    return;
+                                }
+                                
+                                //libera pacotes processados da janela
                                 exclui_msg(janela[j]);
-                                janela[j] = NULL;
+                                desliza_janela(janela, NULL);
                             }
 
-                            envia_ack(socket, seq_esperado + i);
+
+                            //manda ack, adiciona sequencia, e desliza janela
+                            envia_ack(socket, seq_esperado+i);
                             seq_esperado += i;
-                        } else {
+                        } 
+                        //nao eh o pacote esperado
+                        else {
                             envia_nack(socket, seq_esperado);
                             janela[resposta->seq - seq_esperado] = resposta;
                         }
-
+                        //espera pelo proximo pacote
                         espera(socket, -1);
                         resposta = recebe_msg(socket, 1);
                     }
 
-                    envia_ack(socket, seq_esperado);
+                    //ack 0 para o FTX
+                    envia_ack(socket, 0);
 
                     tentativas = 0;
+                    //espera 15 sec, caso receba ftx denovo
                     while (espera(socket, 15) == 1 && tentativas < 5) {
-                        envia_ack(socket, seq_esperado);
+                        envia_ack(socket, 0);
                         tentativas++;
                     }
-
-                    for (size_t k = 0; k < lista_size; k++) {
-                        free(lista[k]);
-                    }
-                    free(lista);
-
-                    printf("Conexão encerrada\n");
-                } else {
-                    if (resposta->tipo == NACK) {
-                        printf("Recebeu NACK\n");
-                    }
-                    if (resposta->tipo == ERRO) {
-                        printf("Recebeu ERRO\n");
-                    }
-                    exclui_msg(resposta);
+                    exclui_lista(lista, seq_esperado);
+                    printf("conexão encerrada\n");
                 }
-            } else {
+                else{
+                    if (resposta->tipo == NACK)
+                        printf("recebeu NACK");
+                    if (resposta->tipo == ERRO)
+                        printf("recebeu ERRO");
+                }
+            }
+            else{
                 printf("Erro ao receber lista de vídeos\nSaindo\n");
                 break;
             }
@@ -211,48 +226,104 @@ Documentação: Adicionar comentários e documentação para explicar o propósi
 // Função para listar arquivos de vídeo no diretório
 void lista_arquivos(int socket) 
 {
-    printf("Tentando abrir o diretório de vídeos: %s\n", VIDEO_DIR);
+    printf("Tentando abrir o diretório de vídeos");
     struct dirent *entry;
-    DIR *dp = opendir(VIDEO_DIR);
+    DIR *dp = opendir("../videos");
     if (dp == NULL) {
         perror("Erro ao abrir diretório de vídeos");
         return;
     }
-
-    char lista[PACKET_DATA_MAX_SIZE * 10] = {0}; // Para acomodar múltiplos nomes de arquivos
-
+    
+    //cria lista de strings com os nomes dos videos
+    char **lista;
+    int qnt_arquivos = 0;
     while ((entry = readdir(dp))) {
         if (entry->d_type == DT_REG) {
-            const char *ext = strrchr(entry->d_name, '.');
+            const char *ext = strrchr(entry->d_name, '.'); //ultimo . no nome do arquivo
             if (ext && (strcmp(ext, ".mp4") == 0 || strcmp(ext, ".avi") == 0)) {
-                strncat(lista, entry->d_name, sizeof(lista) - strlen(lista) - 2);
-                strncat(lista, ",", sizeof(lista) - strlen(lista) - 1);
+                // Adiciona o nome do arquivo a lista
+                lista = realloc(lista, (qnt_arquivos+1) * sizeof(char *));
+                if (lista == NULL){
+                    printf("Erro ao alocar lista de videos");
+                    return;
+                }
+                lista[qnt_arquivos] = realloc(lista[qnt_arquivos], strlen(entry->d_name) * sizeof(char));
+                if (lista[qnt_arquivos] == NULL){
+                    printf("Erro ao alocar lista de videos");
+                    return;
+                }
+                strcpy(lista[qnt_arquivos], entry->d_name);
+                qnt_arquivos++;
             }
         }
     }
-
     closedir(dp);
 
-    // Remove última vírgula
-    size_t len = strlen(lista);
-    if (len > 0 && lista[len - 1] == ',') {
-        lista[len - 1] = '\0';
+    protocolo *janela[MAX_JANELA];
+    memset(janela, 0, MAX_JANELA * sizeof(protocolo*));
+
+    //preenche a janela inicialmente
+    for (int i = 0; i < MAX_JANELA && i < qnt_arquivos; i++){
+        janela[i] = cria_msg(i, MOSTRA_TELA, (uint8_t *)lista[i], strlen(lista[i]));
     }
 
-    // Enviar a lista de arquivos
-    protocolo *lista_msg = cria_msg(0, MOSTRA_TELA, (uint8_t *)lista, strlen(lista));
-    printf("Lista de arquivos disponíveis: %s\n", lista);
-    printf("Enviando mensagem MOSTRA_TELA...\n");
-    envia_msg(socket, lista_msg);
-    imprime_msg(lista_msg);
+    int enviar = qnt_arquivos;
+    int i = 0;
+    int inicio_janela = 0;
+    int fim_janela = MAX_JANELA-1;
+    while (enviar > 0){
+        if (i == fim_janela)
+            i = inicio_janela;
+        envia_msg(socket, janela[i]);
+
+        // se chegou um pacote
+        if (espera(socket, 0) == 0){ //polling
+            protocolo *resposta = recebe_msg(socket, 1);
+            if (resposta){
+                switch (resposta->tipo) {
+                case ACK:
+
+                    //achar alguma forma de cuidar se chegou no final, nesse caso a janela diminui
+                    //inicio_janela++;
+                    //nao mexe no fim
+                    //e para evitar que lista[fim_janela+1] nao passe do limite
+
+                    // avanca pelo numero do ack
+                    for(int j = inicio_janela; j < resposta->seq; j++){
+                        desliza_janela(janela, cria_msg(fim_janela+1, MOSTRA_TELA, (uint8_t *)lista[fim_janela+1], strlen(lista[fim_janela+1])));
+                        enviar--;
+                        inicio_janela++;
+                        fim_janela++;
+                    }
+                    i = inicio_janela; // inicio da nova janela
+                    break;
+                
+                case NACK:
+                    //avanca a janela dependendo a seq
+                    i = resposta->seq-1; // -1 porque da i++ depois do switch
+                    break;
+                
+                case ERRO:
+                    cuidar_erro(resposta);
+                    break;
+
+                default:
+                    break;
+                }
+            }
+            exclui_msg(resposta);
+        }
+        i++;
+    }
+
+    
+
+    
+    // imprime_msg(lista_msg);
     printf("Mensagem MOSTRA_TELA enviada.\n");
     printf("\n");
-    //free(lista_msg);
-    // Libera memória da mensagem
-    if (lista_msg->dados) {
-        free(lista_msg->dados);
-    }
-    free(lista_msg);
+    // exclui_msg(lista_msg);
+    exclui_lista(lista, qnt_arquivos);
 }
 
 // Função para enviar um arquivo ao cliente
@@ -360,24 +431,24 @@ void envia_partes_arquivo(int socket, uint8_t seq_inicial, const char *arquivo)
 void processa_mensagem_cliente(int socket, protocolo *msg) 
 {
     printf("Processando mensagem do cliente:\n");
-    imprime_msg(msg); // Supondo que imprime_msg imprime detalhes da mensagem
-    int marcador_inicio = 126;
+    imprime_msg(msg); //imprime detalhes da mensagem
+    int marcador_inicio = PACKET_START_MARKER;
 
-    switch (msg->tipo) 
+    switch (msg->tipo)
     {
         case LISTA:
             printf("Pedido de lista recebido\n");
 
             // Verifica se a mensagem é válida e envia a resposta correspondente
-            if (marcador_inicio == msg->inicio) 
-            {
-                printf("Mensagem válida\n");
-                lista_arquivos(socket);
+            //CHECAR COM CRC SE EH VALIDA
+                // printf("Mensagem válida\n");
+            envia_ack(socket, 0);
+            lista_arquivos(socket);
 
-            } else {
-                // Se a mensagem for inválida, envie NACK
-                envia_nack(socket, msg->seq);
-            }
+            // } else {
+            //     // Se a mensagem for inválida, envie NACK
+            //     envia_nack(socket, 0);
+            // }
             break;
 
         case BAIXAR:
@@ -413,22 +484,45 @@ void cuidar_erro(protocolo *msg){
         switch (msg->dados[0])
         {
         case 1:
-            //printf(ERRO_ACESSO);
+            //printf(ERRO_ACESSO_NEGADO);
             printf("Erro no acesso ao arquivo\n");
+            exclui_msg(msg);
             exit(1);
             break;
         case 2:
             printf(ERRO_NAO_ENCONTRADO);
+            exclui_msg(msg);
             exit(2);
             break;
         case 3:
             printf(ERRO_DISCO_CHEIO);
+            exclui_msg(msg);
             exit(3);
             break;
         default:
             printf(ERRO_PADRAO);
-            exit(-1);
+            exclui_msg(msg);
+            exit(4);
             break;
         }
     }
+}
+
+char **cria_lista(int tamanho){
+    char **lista = malloc(tamanho * sizeof(char*));
+    if (lista == NULL)
+        return NULL;
+    for(int i = 0; i < tamanho; i++){
+        lista[i] = malloc(64 * sizeof(char));
+        if (lista[i] == NULL)
+            return NULL;
+    }
+    return lista;
+}
+
+void exclui_lista(char **lista, int tamanho){
+    for(int i = 0; i < tamanho; i++){
+        free(lista[i]);
+    }
+    free(lista);
 }

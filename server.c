@@ -18,6 +18,7 @@
 #define SERVER_PORT 12347
 
 // Definições e implementações das estruturas e funções de protocolo
+#include "protocolo.h"
 #include "define.h"
 #include "janela.h"
 #include "raw_socket.h"
@@ -36,6 +37,7 @@ int main()
     printf("Servidor iniciado na interface: %s\n", interface);
 
     while (1) {
+        espera(rsocket, -1);// evita busy waiting
         protocolo *msg = recebe_msg(rsocket, 1);
         if (msg) {
             processa_mensagem_cliente(rsocket, msg);

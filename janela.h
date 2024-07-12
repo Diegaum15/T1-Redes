@@ -34,4 +34,10 @@ void processa_mensagem_cliente(int socket, protocolo *msg);
 // Funcao que lida com o possiveis erros
 void cuidar_erro(protocolo *msg);
 
+// Aloca lista de strings
+char **cria_lista(int tamanho);
+
+// Libera lista de strings
+void exclui_lista(char **lista, int tamanho);
+
 #endif  // JANELA_H
