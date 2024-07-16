@@ -241,35 +241,7 @@ uint8_t ler_msg(protocolo *msg)
 
 void limpa_buffer(char *buffer,int tam)
 {
-	int i;
-	for(i=0;i<tam;i++){
-		buffer[i] = 0;
-	}
-	
-}
-
-void d_erro(uint8_t *codigo)
-{
-	switch(codigo[0]){
-		case 0:
-			fprintf(stderr, "bash: : Arquivo ou diretório não encontrado\n");
-			break;
-		case 1:
-		    fprintf(stderr, "bash: cd: Permissão negada\n");
-			break;
-		case 2:
-			fprintf(stderr, "Symbolic link loop.\n");
-			break;
-		case 3:
-		    fprintf(stderr, "bash: cd: : Nome de arquivo muito longo\n");
-		    break;
-		case 4:
-		    fprintf(stderr, "bash: cd: : Não é um diretório\n");
-		    break;
-		default:
-			printf("ERRO NÂO CONHECIDO\n");
-			break;
-	}
+	memset(buffer, 0, 64 - tam);
 }
 
 void imprime_msg(protocolo *msg)
@@ -286,24 +258,11 @@ void imprime_msg(protocolo *msg)
 	}
 }
 
-/*
-//preenche o resto de dados(de tam até 64) com 1s
-void padding_dados(uint8_t *dados, int tam){
-    for (int i = tam; i < 64; i++) {
-        dados[i] = 0xFF;
-    }
-}
-*/
-
-///*
-// Função de padding para inicializar os dados
 void padding_dados(uint8_t *dados, size_t tam) 
 {
-    memset(dados + tam, 0, 64 - tam); // Inicializa os bytes restantes com zero
+    memset(dados + tam, 0xFF, 64 - tam); // Preenche o restante dos dados com 1s
 }
-//*/
 
-// Função que envia um pedido de lista
 void envia_pedido_lista(int socket) 
 {
     protocolo *lista_msg = cria_msg(0, LISTA, NULL, 0);
@@ -311,7 +270,6 @@ void envia_pedido_lista(int socket)
     exclui_msg(lista_msg);
 }
 
-// Função que envia uma mensagem de ACK
 void envia_ack(int socket, uint8_t seq) 
 {
     protocolo *ack_msg = cria_msg(seq, ACK, NULL, 0);
@@ -319,7 +277,6 @@ void envia_ack(int socket, uint8_t seq)
     exclui_msg(ack_msg);
 }
 
-// Função que envia uma mensagem NACK 
 void envia_nack(int socket, uint8_t seq) 
 {
     protocolo *nack_msg = cria_msg(seq, NACK, NULL, 0);
@@ -327,7 +284,13 @@ void envia_nack(int socket, uint8_t seq)
     exclui_msg(nack_msg);
 }
 
-// Função que envia uma mensagem de erro
+void envia_ftx(int socket) 
+{
+    protocolo *ftx_msg = cria_msg(0, FTX, NULL, 0);
+    envia_msg(socket, ftx_msg);
+    exclui_msg(ftx_msg);
+}
+
 void envia_erro(int socket, uint8_t seq) 
 {
     protocolo *erro_msg = cria_msg(seq, ERRO, NULL, 0);

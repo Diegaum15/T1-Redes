@@ -40,4 +40,6 @@ char **cria_lista(int tamanho);
 // Libera lista de strings
 void exclui_lista(char **lista, int tamanho);
 
+// Libera ponteiros da janela
+void exclui_janela(protocolo **janela);
 #endif  // JANELA_H

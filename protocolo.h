@@ -17,7 +17,7 @@ uint8_t cal_seq(protocolo *msg);
 protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam);
 
 //espera resposta retorna 0 se receber antes de timeout, se nao retorna 1
-//se timeout for -1, espera indeterminadamente
+//se timeout for -1, espera indeterminadamente, se for 0 so checa socket(utilizado para polling)
 int espera(int socket, int timeout);
 
 // Função para enviar uma mensagem
@@ -29,29 +29,28 @@ protocolo* recebe_msg(int socket,int n_msgs);
 // Função para ler uma mensagem
 uint8_t ler_msg(protocolo *msg);
 
-// Função para limpar o buffer
+// zera os bytes de um buffer
 void limpa_buffer(char *buffer,int tam);
-
-// Função para imprimir os erros
-void d_erro(uint8_t *codigo);
 
 // Função para imprimir uma mensagem
 void imprime_msg(protocolo *msg);
 
-//preenche dados com 1s
-//void padding_dados(uint8_t *dados, int tam);
+// preenche o resto de dados(de tam até 64) com 1s
 void padding_dados(uint8_t *dados, size_t tam);
 
 // Função que envia um pedido de lista
 void envia_pedido_lista(int socket);
 
-// Envia uma mensagem com ack
+// Função que envia uma mensagem de ACK
 void envia_ack(int socket, uint8_t seq);
 
-// Envia uma mensagem com nack
+// Função que envia uma mensagem NACK 
 void envia_nack(int socket, uint8_t seq);
 
-// Envia uma mensagem de erro
+// Função que envia uma mensagem FTX
+void envia_ftx(int socket);
+
+// Função que envia uma mensagem de erro
 void envia_erro(int socket, uint8_t seq);
 
 #endif  // PROTOCOLO_H

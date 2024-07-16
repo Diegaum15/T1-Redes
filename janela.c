@@ -33,6 +33,7 @@ void inicializa_janela(janela_deslizante *janela)
 void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next)
 {
     for (int i = 0; i < MAX_JANELA-1; i++){
+        exclui_msg(janela[0]);
         janela[0] = janela[1];
     }
     janela[MAX_JANELA] = next;
@@ -121,8 +122,8 @@ void pede_e_recebe_lista(int socket) {
                     envia_ack(socket, 0);
 
                     tentativas = 0;
-                    //espera 15 sec, caso receba ftx denovo
-                    while (espera(socket, 15) == 1 && tentativas < 5) {
+                    //espera 15 sec, se receber FTX denovo, retorna ack (limite de 5 retornos)
+                    while (espera(socket, 15) == 0 && tentativas < 5) {
                         envia_ack(socket, 0);
                         tentativas++;
                     }
@@ -267,62 +268,74 @@ void lista_arquivos(int socket)
         janela[i] = cria_msg(i, MOSTRA_TELA, (uint8_t *)lista[i], strlen(lista[i]));
     }
 
-    int enviar = qnt_arquivos;
-    int i = 0;
+    int i = 0; //indice da janela a enviar
     int inicio_janela = 0;
-    int fim_janela = MAX_JANELA-1;
-    while (enviar > 0){
+    //se tem menos arquivos que o tamanho da janela, ja inicia menor
+    int fim_janela = qnt_arquivos > MAX_JANELA-1? MAX_JANELA-1: qnt_arquivos-1;
+    while (1){
+        //se chegou no fim da janela, envia ela novamente
         if (i == fim_janela)
             i = inicio_janela;
         envia_msg(socket, janela[i]);
+        i++;
 
         // se chegou um pacote
         if (espera(socket, 0) == 0){ //polling
             protocolo *resposta = recebe_msg(socket, 1);
-            if (resposta){
-                switch (resposta->tipo) {
-                case ACK:
+            if (resposta == NULL){
+                printf("Erro ao receber resposta do servidor\n");
+                exit(1);
+            }
+            //cliente recebeu o ultimo, acaba
+            if (resposta->tipo == ACK && resposta->seq == qnt_arquivos-1)
+                break;
 
-                    //achar alguma forma de cuidar se chegou no final, nesse caso a janela diminui
-                    //inicio_janela++;
-                    //nao mexe no fim
-                    //e para evitar que lista[fim_janela+1] nao passe do limite
-
-                    // avanca pelo numero do ack
-                    for(int j = inicio_janela; j < resposta->seq; j++){
-                        desliza_janela(janela, cria_msg(fim_janela+1, MOSTRA_TELA, (uint8_t *)lista[fim_janela+1], strlen(lista[fim_janela+1])));
-                        enviar--;
+            if (resposta->tipo == ACK || resposta->tipo == NACK){ 
+                
+                uint8_t qnt_avancar = resposta->tipo == ACK? resposta->seq: resposta->seq-1;
+                // avanca pelo numero do ack
+                for(int j = inicio_janela; j <= qnt_avancar; j++){
+                    //se nao chegou ao fim
+                    if(fim_janela != qnt_arquivos-1){
+                        uint8_t *dados = (uint8_t *)lista[fim_janela+1];
+                        size_t tam = strlen(lista[fim_janela+1]);
+                        padding_dados(dados, tam); //preenche dados com 1s
+                        //anda janela, e adiciona nova msg no final
+                        desliza_janela(janela, cria_msg(fim_janela+1, MOSTRA_TELA, dados, tam));
                         inicio_janela++;
                         fim_janela++;
                     }
-                    i = inicio_janela; // inicio da nova janela
-                    break;
-                
-                case NACK:
-                    //avanca a janela dependendo a seq
-                    i = resposta->seq-1; // -1 porque da i++ depois do switch
-                    break;
-                
-                case ERRO:
-                    cuidar_erro(resposta);
-                    break;
-
-                default:
-                    break;
+                    //janela diminui pois chegou no fim
+                    else{
+                        // avanca pelo numero do ack
+                        for(int j = inicio_janela; j < qnt_avancar; j++){
+                            inicio_janela++;
+                        }
+                    }
                 }
+                // reenvia a janela caso seja nack
+                if (resposta->tipo == NACK)
+                    i = inicio_janela; 
+            }
+            else if (resposta->tipo == ERRO){
+                cuidar_erro(resposta);
             }
             exclui_msg(resposta);
         }
-        i++;
     }
 
-    
+    //envia FTX
+    envia_ftx(socket);
 
+    int tentativas = 0;
+    //espera 10 sec, para receber ack, se nao receber manda outro FTX
+    while (espera(socket, 10) == 1 && tentativas < 5) {
+        envia_ftx(socket);
+        tentativas++;
+    }
+    printf("conexão encerrada\n");
     
-    // imprime_msg(lista_msg);
-    printf("Mensagem MOSTRA_TELA enviada.\n");
-    printf("\n");
-    // exclui_msg(lista_msg);
+    exclui_janela(janela);
     exclui_lista(lista, qnt_arquivos);
 }
 
@@ -525,4 +538,10 @@ void exclui_lista(char **lista, int tamanho){
         free(lista[i]);
     }
     free(lista);
+}
+
+void exclui_janela(protocolo **janela){
+    for(int i = 0; i < MAX_JANELA; i++){
+        exclui_msg(janela[i]);
+    }
 }
