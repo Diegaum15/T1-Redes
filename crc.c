@@ -1,4 +1,3 @@
-#include "define.h"
 #include "crc.h"
 
 const uint8_t crc8_table[256] = {

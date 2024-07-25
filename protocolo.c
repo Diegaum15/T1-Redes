@@ -1,6 +1,4 @@
-#include "define.h"
 #include "protocolo.h"
-#include "crc.h"
 
 void exclui_msg(protocolo *msg) {
     if (msg) {
@@ -13,7 +11,7 @@ void exclui_msg(protocolo *msg) {
 
 uint8_t* aloca_vetor(int tam) 
 {
-    uint8_t* dados = (uint8_t*)malloc(tam + 1); // Alocar espaço para dados + 1 para o terminador
+    uint8_t* dados = (uint8_t*)malloc(tam); // Alocar espaço para dados
     if (!dados) {
         fprintf(stderr, "Falha ao alocar vetor de uint8_t - Dados ou buffer\n");
         exit(-1);
@@ -103,14 +101,13 @@ int espera(int socket, int timeout){
         return 1;
 }
 
-void envia_msg(int socket,protocolo *msg)
+void envia_msg(int socket, protocolo *msg)
 {
 	uint8_t *buffer;
-	int i=0,tam_buffer;
+	int i=0,tam_buffer = 67;
 	
 	if(msg)
     {
-		tam_buffer = 67;
 		buffer = aloca_vetor(tam_buffer);
 		//inicio
 		buffer[0] = msg->inicio;
@@ -122,7 +119,7 @@ void envia_msg(int socket,protocolo *msg)
 		//tipo
 		buffer[2] |= (msg->tipo); // não precisa desloca
 		//dados
-		for(i=0;i<msg->tam;i++){
+		for(i=0;i<64;i++){
 			buffer[3+i] = msg->dados[i];
 		}
 		//crc
@@ -180,7 +177,7 @@ protocolo* recebe_msg(int socket,int n_msgs)
 		//tamanho
 		msg->tam = (buffer[1] >> 2);
 		//aloca vetor DADOS
-		msg->dados = aloca_vetor(msg->tam);
+		msg->dados = (uint8_t*)malloc(64);
 		//sequencia
 		msg->seq = (buffer[1] << 6);
 		msg->seq = (msg->seq >> 3); // acerta 3 bits mais significativos em 0
@@ -189,7 +186,7 @@ protocolo* recebe_msg(int socket,int n_msgs)
 		msg->tipo = (buffer[2] << 3);
 		msg->tipo = (msg->tipo >> 3);
 		//dados
-		for(i=0;i<msg->tam;i++){
+		for(i=0;i<64;i++){
 			msg->dados[i] = buffer[i+3];
 		}
 		//crc
@@ -252,9 +249,11 @@ void imprime_msg(protocolo *msg)
 		printf("TAM : %d \n",msg->tam);
 		printf("SEQ : %d \n",msg->seq);
 		printf("TIPO : %d \n",msg->tipo);
-		printf("DADOS : %s \n",(char*)msg->dados);
-        printf("CRC : %d \n",msg->crc);
-        printf("\n");
+        printf("DADOS :");
+        for (int i = 0; i < 64; i++){
+		    printf("%d ",msg->dados[i]);
+        }
+        printf("\nCRC : %d \n",msg->crc);
 	}
 }
 

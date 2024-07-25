@@ -1,5 +1,6 @@
 #ifndef RAW_SOCKET_H
 #define RAW_SOCKET_H
+#include "protocolo.h"
 
 int abrirRawSocket(char *interface);
 

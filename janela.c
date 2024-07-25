@@ -1,10 +1,4 @@
-#include "define.h"
 #include "janela.h"
-#include "protocolo.h"
-#include <linux/if_packet.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 // Caso que o cliente manda uma mensagem do tipo lista "01010"
 // Servidor pode responder com ACK? , NACK, MOSTRA_TELA ou ERRO
@@ -52,23 +46,24 @@ void pede_e_recebe_lista(int socket) {
         } else {
             protocolo *resposta = recebe_msg(socket, 1);
             if (resposta) {
-                printf("Dentro da função recebe_lista\n");
-                printf("Tipo da mensagem recebida: %d\n", resposta->tipo);
-                printf("Sequência da mensagem recebida: %d\n", resposta->seq);
-                printf("Dados da mensagem recebida: %s\n", resposta->dados);
-                printf("\n");
 
                 if (resposta->tipo == ACK || resposta->tipo == MOSTRA_TELA) {
                     int seq_esperado = 0;
 
                     if (resposta->tipo == ACK) {
+                        printf("recebeu ACK\n");
+                        imprime_msg(resposta);
                         exclui_msg(resposta);
                         espera(socket, -1);
                         resposta = recebe_msg(socket, 1);
+                        printf("recebeu MOSTRA_TELA\n");
+                    }
+                    else{
+                        printf("recebeu MOSTRA_TELA\n");
                     }
 
                     protocolo *janela[MAX_JANELA];
-                    memset(janela, 0, MAX_JANELA * sizeof(protocolo*));
+                    // memset(janela, 0, MAX_JANELA * sizeof(protocolo*));
                     char **lista = NULL;
                     //enquanto nao acabar a transmissao
                     while (resposta->tipo != FTX){
@@ -131,10 +126,16 @@ void pede_e_recebe_lista(int socket) {
                     printf("conexão encerrada\n");
                 }
                 else{
-                    if (resposta->tipo == NACK)
-                        printf("recebeu NACK");
-                    if (resposta->tipo == ERRO)
-                        printf("recebeu ERRO");
+                    if (resposta->tipo == NACK){
+                        printf("recebeu NACK\n");
+                        tentativas++;
+                    }
+                    if (resposta->tipo == ERRO){
+                        printf("recebeu ERRO\n");
+                        tentativas++;
+                    }
+                    if (resposta->tipo == LISTA)
+                        printf("recebeu proprio pedido LISTA; ignorado\n");
                 }
             }
             else{
@@ -227,30 +228,31 @@ Documentação: Adicionar comentários e documentação para explicar o propósi
 // Função para listar arquivos de vídeo no diretório
 void lista_arquivos(int socket) 
 {
-    printf("Tentando abrir o diretório de vídeos");
+    printf("Tentando abrir o diretório de vídeos\n");
     struct dirent *entry;
-    DIR *dp = opendir("../videos");
+    DIR *dp = opendir("./videos");
     if (dp == NULL) {
-        perror("Erro ao abrir diretório de vídeos");
+        envia_erro(socket, 0);
+        perror("Erro ao abrir diretório de vídeos\n");
         return;
     }
     
     //cria lista de strings com os nomes dos videos
-    char **lista;
+    char **lista = NULL;
     int qnt_arquivos = 0;
-    while ((entry = readdir(dp))) {
-        if (entry->d_type == DT_REG) {
+    while ((entry = readdir(dp)) != NULL) {
+        if (entry->d_type == DT_REG){
             const char *ext = strrchr(entry->d_name, '.'); //ultimo . no nome do arquivo
             if (ext && (strcmp(ext, ".mp4") == 0 || strcmp(ext, ".avi") == 0)) {
                 // Adiciona o nome do arquivo a lista
                 lista = realloc(lista, (qnt_arquivos+1) * sizeof(char *));
                 if (lista == NULL){
-                    printf("Erro ao alocar lista de videos");
+                    printf("Erro ao alocar lista de videos\n");
                     return;
                 }
                 lista[qnt_arquivos] = realloc(lista[qnt_arquivos], strlen(entry->d_name) * sizeof(char));
                 if (lista[qnt_arquivos] == NULL){
-                    printf("Erro ao alocar lista de videos");
+                    printf("Erro ao alocar lista de videos\n");
                     return;
                 }
                 strcpy(lista[qnt_arquivos], entry->d_name);
@@ -259,6 +261,20 @@ void lista_arquivos(int socket)
         }
     }
     closedir(dp);
+    int y = 0;
+    while (lista[y] != NULL){
+        printf("lista[%d] = %s\n",y, lista[y]);
+        y++;
+    }
+
+    if (qnt_arquivos == 0){
+        envia_erro(socket, 0);
+        printf("Nenhum arquivo de vídeo encontrado\n");
+        return;
+    }
+
+    //confirma que acessou listas e esta pronto para enviar
+    envia_ack(socket, 0);
 
     protocolo *janela[MAX_JANELA];
     memset(janela, 0, MAX_JANELA * sizeof(protocolo*));
@@ -340,50 +356,50 @@ void lista_arquivos(int socket)
 }
 
 // Função para enviar um arquivo ao cliente
-void envia_arquivo(int socket, const char *filename) 
-{
-    char filepath[256];
-    snprintf(filepath, sizeof(filepath), "%s/%s", VIDEO_DIR, filename);
-    printf("Tentando abrir o arquivo: %s\n", filepath);
+// void envia_arquivo(int socket, const char *filename) 
+// {
+//     char filepath[256];
+//     snprintf(filepath, sizeof(filepath), "%s/%s", VIDEO_DIR, filename);
+//     printf("Tentando abrir o arquivo: %s\n", filepath);
 
-    int fd = open(filepath, O_RDONLY);
-    if (fd < 0) {
-        perror("Erro ao abrir arquivo para leitura");
-        envia_erro(socket, 0x01); // Acesso negado
-        return;
-    }
+//     int fd = open(filepath, O_RDONLY);
+//     if (fd < 0) {
+//         perror("Erro ao abrir arquivo para leitura");
+//         envia_erro(socket, 0x01); // Acesso negado
+//         return;
+//     }
 
-    struct stat st;
-    if (fstat(fd, &st) < 0) {
-        perror("Erro ao obter informações do arquivo");
-        close(fd);
-        envia_erro(socket, 0x01);
-        return;
-    }
+//     struct stat st;
+//     if (fstat(fd, &st) < 0) {
+//         perror("Erro ao obter informações do arquivo");
+//         close(fd);
+//         envia_erro(socket, 0x01);
+//         return;
+//     }
 
-    size_t tamanho = st.st_size;
-    char descritor[128];
-    snprintf(descritor, sizeof(descritor), "tamanho=%zu,data=20230601", tamanho);
+//     size_t tamanho = st.st_size;
+//     char descritor[128];
+//     snprintf(descritor, sizeof(descritor), "tamanho=%zu,data=20230601", tamanho);
 
-    protocolo *descritor_msg = cria_msg(0, DESCRITOR_ARQUIVO, (uint8_t *)descritor, strlen(descritor));
-    envia_msg(socket, descritor_msg);
-    free(descritor_msg);
+//     protocolo *descritor_msg = cria_msg(0, DESCRITOR_ARQUIVO, (uint8_t *)descritor, strlen(descritor));
+//     envia_msg(socket, descritor_msg);
+//     free(descritor_msg);
 
-    uint8_t buffer[PACKET_DATA_MAX_SIZE];
-    ssize_t bytes_lidos;
+//     uint8_t buffer[PACKET_DATA_MAX_SIZE];
+//     ssize_t bytes_lidos;
 
-    while ((bytes_lidos = read(fd, buffer, sizeof(buffer))) > 0) {
-        protocolo *dados_msg = cria_msg(0, DADOS, buffer, bytes_lidos);
-        envia_msg(socket, dados_msg);
-        free(dados_msg);
-    }
+//     while ((bytes_lidos = read(fd, buffer, sizeof(buffer))) > 0) {
+//         protocolo *dados_msg = cria_msg(0, DADOS, buffer, bytes_lidos);
+//         envia_msg(socket, dados_msg);
+//         free(dados_msg);
+//     }
 
-    close(fd);
+//     close(fd);
 
-    protocolo *ftx_msg = cria_msg(0, FTX, NULL, 0);
-    envia_msg(socket, ftx_msg);
-    free(ftx_msg);
-}
+//     protocolo *ftx_msg = cria_msg(0, FTX, NULL, 0);
+//     envia_msg(socket, ftx_msg);
+//     free(ftx_msg);
+// }
 
 // Encher como lixo se for usar menos de 63 bytes
 // Função para mandar os arquivos em partes
@@ -445,17 +461,15 @@ void processa_mensagem_cliente(int socket, protocolo *msg)
 {
     printf("Processando mensagem do cliente:\n");
     imprime_msg(msg); //imprime detalhes da mensagem
-    int marcador_inicio = PACKET_START_MARKER;
 
     switch (msg->tipo)
     {
         case LISTA:
-            printf("Pedido de lista recebido\n");
+            printf("Pedido de lista recebido\n\n");
 
             // Verifica se a mensagem é válida e envia a resposta correspondente
             //CHECAR COM CRC SE EH VALIDA
                 // printf("Mensagem válida\n");
-            envia_ack(socket, 0);
             lista_arquivos(socket);
 
             // } else {
@@ -465,26 +479,31 @@ void processa_mensagem_cliente(int socket, protocolo *msg)
             break;
 
         case BAIXAR:
-            printf("Pedido de download recebido\n");
+            printf("Pedido de download recebido\n\n");
             //envia_ack(socket, msg->seq);
             envia_partes_arquivo(socket, msg->seq + 1, (char *)msg->dados);
             break;
 
         case ACK:
-            printf("ACK recebido\n");
+            printf("ACK recebido\n\n");
             // Processa ACK conforme necessário
             break;
 
         case NACK:
-            printf("NACK recebido\n");
+            printf("NACK recebido\n\n");
             // Processa NACK conforme necessário
             break;
 
         case FTX:
-            printf("FTX recebido\n");
+            printf("FTX recebido\n\n");
             // Processa FTX conforme necessário
             break;
-
+        
+        case ERRO:
+            printf("ERRO recebido\n\n");
+            // Processa ERRO conforme necessário
+            break;
+        
         //default:
           //  printf("Tipo de mensagem não reconhecido: %d\n", msg->tipo);
             //envia_erro(socket, msg->seq);

@@ -1,5 +1,10 @@
 #ifndef JANELA_H
 #define JANELA_H
+#include "protocolo.h"
+#include <linux/if_packet.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 // Inicializa a estrutura da janela deslizante
 void inicializa_janela(janela_deslizante *janela);

@@ -19,7 +19,6 @@
 
 // Definições e implementações das estruturas e funções de protocolo
 #include "protocolo.h"
-#include "define.h"
 #include "janela.h"
 #include "raw_socket.h"
 #include "protocolo.h"
@@ -27,7 +26,7 @@
 int main() 
 {
     int rsocket;
-    char interface[] = "lo"; // Interface de rede (loopback)
+    char interface[] = "eth0"; // Interface de rede (loopback)
     rsocket = abrirRawSocket(interface);
     if (rsocket < 0) {
         fprintf(stderr, "Erro ao abrir socket RAW.\n");
@@ -37,13 +36,14 @@ int main()
     printf("Servidor iniciado na interface: %s\n", interface);
 
     while (1) {
-        espera(rsocket, -1);// evita busy waiting
-        protocolo *msg = recebe_msg(rsocket, 1);
-        if (msg) {
-            processa_mensagem_cliente(rsocket, msg);
-            exclui_msg(msg);
-        } else {
-            fprintf(stderr, "Erro ao receber mensagem do cliente.\n");
+        if (espera(rsocket, -1) == 0){// evita busy waiting
+            protocolo *msg = recebe_msg(rsocket, 1);
+            if (msg) {
+                processa_mensagem_cliente(rsocket, msg);
+                exclui_msg(msg);
+            } else {
+                fprintf(stderr, "Erro ao receber mensagem do cliente.\n");
+            }
         }
     }
 
@@ -148,7 +148,7 @@ int main()
 }
 
 
-/* teste das funcoes de janela
+// teste das funcoes de janela
 int main() {
     int rsocket;
     char interface[] = "lo";

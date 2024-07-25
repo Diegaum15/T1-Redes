@@ -1,4 +1,4 @@
-#include "define.h"
+#include "raw_socket.h"
 
 int abrirRawSocket(char *interface) 
 {

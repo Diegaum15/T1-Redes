@@ -1,4 +1,3 @@
-#include "define.h"
 #include "raw_socket.h"
 #include "janela.h"
 #include "protocolo.h"
@@ -42,7 +41,7 @@ void interface_cliente(int socket, janela_deslizante *janela)
 int main() 
 {
     int rsocket;
-    char interface[] = "lo"; // Interface de rede (loopback)
+    char interface[] = "eth0"; // Interface de rede (loopback)
     rsocket = abrirRawSocket(interface);
     if (rsocket < 0) {
         fprintf(stderr, "Erro ao abrir socket RAW.\n");
