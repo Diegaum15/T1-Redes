@@ -33,16 +33,15 @@ int main()
         exit(1);
     }
 
-    printf("Servidor iniciado na interface: %s\n", interface);
-
     while (1) {
+        printf("Servidor aguardando na interface: %s\n", interface);
         if (espera(rsocket, -1) == 0){// evita busy waiting
             protocolo *msg = recebe_msg(rsocket, 1);
             if (msg) {
                 processa_mensagem_cliente(rsocket, msg);
                 exclui_msg(msg);
             } else {
-                fprintf(stderr, "Erro ao receber mensagem do cliente.\n");
+                fprintf(stderr, "Mensagem recebida invalida.\n");
             }
         }
     }

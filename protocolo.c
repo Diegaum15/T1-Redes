@@ -250,7 +250,7 @@ void imprime_msg(protocolo *msg)
 		printf("SEQ : %d \n",msg->seq);
 		printf("TIPO : %d \n",msg->tipo);
         printf("DADOS :");
-        for (int i = 0; i < 64; i++){
+        for (int i = 0; i < 63; i++){
 		    printf("%d ",msg->dados[i]);
         }
         printf("\nCRC : %d \n",msg->crc);
