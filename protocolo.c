@@ -17,7 +17,7 @@ uint8_t* aloca_vetor(int tam)
         exit(-1);
     }
     //dados[tam] = '\0'; // Adicionar terminador nulo no final dos dados
-    memset(dados, 0, tam + 1); // Inicializa o vetor alocado com zeros
+    memset(dados, 0, tam); // Inicializa o vetor alocado com zeros
     return dados;
 }
 
@@ -140,22 +140,22 @@ void envia_msg(int socket, protocolo *msg)
 
 //MUDAR A IMPLEMENTAÇÃO DO CRC, calcular em cima com o crc recebido e comparar com 0
 // n_msgs??
+protocolo* recebe_msg(int socket, int n_msgs) {
+    protocolo *msg;
+    uint8_t *buffer;
+    int i, tam_buffer;
 
-protocolo* recebe_msg(int socket,int n_msgs)
-{
-	protocolo *msg;
-	uint8_t *buffer;
-	int i,tam_buffer;
-	
-	//4bytes fixo + 63 bytes dados max
-	tam_buffer = 67;
-	
+    // Tamanho fixo de 67 bytes
+    tam_buffer = 67;
+
+    // Aloca buffer
     buffer = (uint8_t*)malloc(tam_buffer);
     if (!buffer) {
         fprintf(stderr, "Falha ao alocar buffer\n");
         exit(-1);
     }
 
+    // Aloca mensagem
     msg = (protocolo*)malloc(sizeof(protocolo));
     if (!msg) {
         fprintf(stderr, "Falha ao alocar mensagem\n");
@@ -163,6 +163,11 @@ protocolo* recebe_msg(int socket,int n_msgs)
         exit(-1);
     }
 
+    // Inicializa o buffer da mensagem
+    memset(buffer, 0, tam_buffer);
+    memset(msg, 0, sizeof(protocolo));
+
+    // Recebe mensagem e salva no buffer
     int bytes_read = read(socket, buffer, tam_buffer);
     if (bytes_read <= 0) {
         free(buffer);
@@ -170,49 +175,60 @@ protocolo* recebe_msg(int socket,int n_msgs)
         return NULL;
     }
 
-	if(buffer[0] == PACKET_START_MARKER)
-    {
-		//inicio
-		msg->inicio = buffer[0];
-		//tamanho
-		msg->tam = (buffer[1] >> 2);
-		//aloca vetor DADOS
-		msg->dados = (uint8_t*)malloc(64);
-		//sequencia
-		msg->seq = (buffer[1] << 6);
-		msg->seq = (msg->seq >> 3); // acerta 3 bits mais significativos em 0
-		msg->seq |= (buffer[2] >> 5);
-		//tipo
-		msg->tipo = (buffer[2] << 3);
-		msg->tipo = (msg->tipo >> 3);
-		//dados
-		for(i=0;i<64;i++){
-			msg->dados[i] = buffer[i+3];
-		}
-		//crc
+    if (buffer[0] == PACKET_START_MARKER) {
+        // Inicio
+        msg->inicio = buffer[0];
+        // Tamanho
+        msg->tam = (buffer[1] >> 2);
+
+        // Aloca vetor DADOS
+        msg->dados = (uint8_t*)malloc(64);
+        if (!msg->dados) {
+            fprintf(stderr, "Falha ao alocar vetor de dados\n");
+            free(buffer);
+            free(msg);
+            exit(-1);
+        }
+        memset(msg->dados, 0, 64);
+
+        // Sequência
+        msg->seq = (buffer[1] << 6);
+        msg->seq = (msg->seq >> 3); // Acessa os 3 bits mais significativos
+        msg->seq |= (buffer[2] >> 5);
+
+        // Tipo
+        msg->tipo = (buffer[2] << 3);
+        msg->tipo = (msg->tipo >> 3);
+
+        // Dados
+        for (i = 0; i < 64; i++) {
+            msg->dados[i] = buffer[i + 3];
+        }
+
+        // CRC
         uint8_t received_crc = buffer[bytes_read - 1];
         msg->crc = calc_crc8_with_table(buffer, bytes_read - 1);
 
         // Verifica se o CRC recebido é válido
-        if (msg->crc != received_crc) 
-        {
+        if (msg->crc != received_crc) {
             fprintf(stderr, "ERRO: CRC inválido na mensagem recebida.\n");
             free(msg->dados);
             free(msg);
             free(buffer);
-            return NULL; // Retorna NULL em caso de CRC inválido
+            return NULL;
         }
 
-		//libera BUFFER
-		free(buffer);
-		return (msg);
-	}else{
-		//lixo
+        // Libera buffer
+        free(buffer);
+        return msg;
+    } else {
+        // Lixo
         free(buffer);
         free(msg);
-		return(NULL);
-	}
+        return NULL;
+    }
 }
+
 
 uint8_t ler_msg(protocolo *msg) 
 {
