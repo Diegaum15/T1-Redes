@@ -42,8 +42,8 @@
 #define NACK 0x01		  		//"00001"  1
 #define LISTA 0x0A		  		//"01010"  10
 #define BAIXAR 0x0B		  		//"01011"  11
-#define MOSTRA_TELA 0x10  		//"10000"  12
-#define DESCRITOR_ARQUIVO 0x11  //"10001"  13
+#define MOSTRA_TELA 0x10  		//"10000"  16
+#define DESCRITOR_ARQUIVO 0x11  //"10001"  17
 #define DADOS 0x12		        //"10010"  18
 #define FTX 0x1E		   		//"11110"  30
 #define ERRO 0x1F		   		//"11111"  31

@@ -94,8 +94,13 @@ int espera(int socket, int timeout){
         ret = select(socket + 1, &readfds, NULL, NULL, &tv);
     }
 
+    if (ret == -1){
+        printf("Erro lendo socket\n");
+        return -1;
+    }
+
     //testa se recebeu algo
-    if (ret && FD_ISSET(socket, &readfds))
+    if (ret > 0 && FD_ISSET(socket, &readfds))
         return 0;
     else
         return 1;
