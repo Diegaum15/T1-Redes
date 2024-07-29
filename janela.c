@@ -66,13 +66,16 @@ void pede_e_recebe_lista(int socket) {
                         printf("recebeu MOSTRA_TELA direto\n");
                     }
 
+                    tentativas = 0;
                     protocolo *janela[MAX_JANELA];
                     memset(janela, 0, MAX_JANELA * sizeof(protocolo*));
                     char **lista = NULL;
                     int seq_esperado = 0;
                     // enquanto nao acabar a transmissao
                     while (resposta == NULL || resposta->tipo != FTX) {
-                        if (resposta){
+                        if (resposta != NULL && resposta->inicio == PACKET_START_MARKER && (resposta->tipo == MOSTRA_TELA || resposta->tipo == FTX)){
+                            printf("pacote VALIDO\n");
+                            imprime_msg(resposta);
                             if (resposta->tipo == ERRO)
                                 cuidar_erro(resposta);
 
@@ -95,7 +98,7 @@ void pede_e_recebe_lista(int socket) {
                                     return;
                                 }
                                 for (int j = 0; j < i; j++) {
-                                    lista[seq_esperado + j] = strndup((char*)janela[j]->dados, janela[j]->tam);
+                                    lista[seq_esperado + j] = strndup((char*)janela[0]->dados, janela[0]->tam);
                                     if (lista[seq_esperado + j] == NULL) {
                                         printf("Erro ao alocar lista de videos");
                                         exclui_lista(lista, seq_esperado + j);
@@ -114,9 +117,17 @@ void pede_e_recebe_lista(int socket) {
                             } else { //nao eh o esperado
                                 printf("ENVIANDO NACK %d\n", seq_esperado%32);
                                 envia_nack(socket, seq_esperado%32);
-                                if (resposta->seq - (seq_esperado%32) > 0)
-                                    janela[resposta->seq - (seq_esperado%32)] = resposta;
+                                int diferenca = resposta->seq - seq_esperado%32;
+                                if (diferenca > 0 && diferenca < MAX_JANELA)
+                                    janela[diferenca] = resposta;
                             }
+                        }
+                        else{
+                            printf("pacote INVALIDO\n");
+                            if (resposta != NULL){
+                                printf("tentando imprimir msg\n");
+                                imprime_msg(resposta);
+                            } 
                         }
 
                         //espera pelo proximo pacote
@@ -124,22 +135,14 @@ void pede_e_recebe_lista(int socket) {
                         if (socket > 1024){
                             printf("socket = %d\n", socket);
                         }
-                        espera(socket, -1);
-                        resposta = recebe_msg(socket, 1);
-                        if (resposta != NULL && resposta->inicio == PACKET_START_MARKER && (resposta->tipo == MOSTRA_TELA || resposta->tipo == FTX)){
-                            printf("pacote VALIDO\n");
-                            imprime_msg(resposta);
-                        } else {
-                            printf("pacote INVALIDO\n");
-                            if (resposta != NULL){
-                                printf("tentando imprimir msg\n");
-                                imprime_msg(resposta);
-                            } 
-                            // else{
-                            //     exclui_lista(lista, seq_esperado);
-                            //     exclui_janela(janela);
-                            //     return;
-                            // }
+                        if (espera(socket, 7) == 0){
+                            resposta = recebe_msg(socket, 1);
+                        }
+                        else{
+                            printf("timeout, sem resposta do servidor a 7 segundos\n");
+                            exclui_lista(lista, seq_esperado);
+                            exclui_janela(janela);
+                            return;
                         }
                     }
                     printf("recebeu FTX\n");
@@ -345,6 +348,7 @@ void lista_arquivos(int socket) {
     int inicio_janela = 0;
     int acabou = 0;
     int voltas = 0;
+    int tentativas = 0;
     // Se tem menos arquivos que o tamanho da janela, já inicia menor
     int fim_janela = qnt_arquivos > MAX_JANELA - 1 ? MAX_JANELA - 1 : qnt_arquivos - 1;
     while (acabou == 0){
@@ -352,17 +356,24 @@ void lista_arquivos(int socket) {
         printf("inicio_janela = %d\n", inicio_janela);
         printf("fim_janela = %d\n", fim_janela);
         // Se chegou no fim da janela, envia ela novamente
-        if (i == fim_janela + 1) //mais 1 para mandar o ultimo
+        if (i == fim_janela + 1){ //mais 1 para mandar o ultimo
             i = inicio_janela;
-mak
+            tentativas++;
+        }
+        if (tentativas == 16){
+            printf("Timeout, sem resposta do cliente apos 16 tentativas\n");
+            return;
+        }
+
         printf("enviando dado janela[%d] = %p\n", (i+(MAX_JANELA-1))-fim_janela, janela[(i+(MAX_JANELA-1))-fim_janela]);
         imprime_msg(janela[(i+(MAX_JANELA-1))-fim_janela]);
         envia_msg(socket, janela[(i+(MAX_JANELA-1))-fim_janela]);
 
-        // Se chegou um pacote
-        // int tempo = i == fim_janela ? 1 : 0; // Se for o último da janela, espera 1 seg, se não espera 0 (polling)
         int tempo = 0;
-        while (espera(socket, tempo) == 0) {
+        if (tentativas == 9) //se janela deu 10 voltas sem receber, espera 1 seg para receber
+            tempo = 1;
+        while (espera(socket, tempo) == 0) { // Se chegou um pacote
+            tentativas = 0;
             protocolo *resposta = recebe_msg(socket, 1);
             if (resposta == NULL || resposta->inicio != PACKET_START_MARKER) {
                 exclui_msg(resposta);
@@ -372,6 +383,9 @@ mak
 
             if (resposta->tipo == ACK || resposta->tipo == NACK) {
                 printf("RECEBEU %s %d\n", resposta->tipo == ACK ? "ACK" : "NACK", resposta->seq);
+                if (resposta->tipo == NACK && resposta->seq == 5){
+                    printf("aa\n");
+                }
                 //seq eh = seq do ack, ou seq - 1 do nack
                 int sequencia = resposta->tipo == ACK ? resposta->seq: resposta->seq - 1;
                 if (sequencia == -1)
@@ -388,7 +402,7 @@ mak
                     }
                 }
 
-                uint8_t qnt_avancar = sequencia + (voltas * 32);
+                int qnt_avancar = sequencia + (voltas * 32);
                 // Avança pela sequencia recebida pelo ACK ou NACK
                 for (int j = inicio_janela; j <= qnt_avancar; j++) {
                     // Se não chegou ao fim
@@ -410,8 +424,9 @@ mak
                 }
                 if (i < inicio_janela-1)
                     i = inicio_janela-1;
+            }
             // Reenvia a janela caso seja NACK
-            if (resposta->tipo == NACK)
+            if (resposta->tipo == NACK){
                 i = inicio_janela-1;
             } else if (resposta->tipo == ERRO) {
                 cuidar_erro(resposta);
@@ -424,7 +439,7 @@ mak
     // Envia FTX
     envia_ftx(socket);
 
-    int tentativas = 0;
+    tentativas = 0;
     // Espera 1 seg para receber ACK, se não receber manda outro FTX
     acabou = 0;
     while (acabou == 0){
