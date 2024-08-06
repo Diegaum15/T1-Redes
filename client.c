@@ -25,7 +25,7 @@ void interface_cliente(int socket, janela_deslizante *janela)
                 printf("Digite o nome do vídeo a ser baixado: ");
                 scanf("%s", video);
                 //cliente_manda_baixar(socket, video, janela);
-                baixa_arquivo(socket, video, janela);
+                pede_e_recebe_video(socket, video);
                 break;
             case 3:
                 printf("Saindo...\n");

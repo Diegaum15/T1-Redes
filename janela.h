@@ -15,6 +15,8 @@ void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next);
 // Função que envia pedido e recebe lista de arquivos disponíveis no servidor
 void pede_e_recebe_lista(int socket);
 
+void pede_e_recebe_video(int socket, const char *nome_video);
+
 // Função que baixa um arquivo do servidor
 void baixa_arquivo(int socket, const char *filename, janela_deslizante *janela);
 
@@ -35,6 +37,8 @@ void envia_partes_arquivo(int socket, uint8_t seq_inicial, const char *arquivo);
 
 // Função que processa a mensagem do cliente
 void processa_mensagem_cliente(int socket, protocolo *msg);
+
+void pede_e_recebe_video(int socket, const char *nome_video);
 
 // Funcao que lida com o possiveis erros
 void cuidar_erro(protocolo *msg);

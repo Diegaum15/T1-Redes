@@ -2,10 +2,12 @@
 
 void exclui_msg(protocolo *msg) {
     if (msg) {
-        if (msg->dados) {
+        if (msg->dados != NULL) {
             free(msg->dados);
+            msg->dados = NULL;
         }
         free(msg);
+        msg = NULL;
     }
 }
 
@@ -70,6 +72,7 @@ protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam)
     return msg;
 }
 
+//*/
 
 int espera(int socket, int timeout){
     fd_set readfds;
@@ -135,8 +138,19 @@ void envia_msg(int socket, protocolo *msg)
 
         // Incluir o valor do CRC no último byte do buffer
         buffer[tam_buffer - 1] = msg->crc;
+
+        // Log antes de enviar
+        //printf("\n");
+        //printf("Dentro da funcao envia_msg\n");
+        //printf("Enviando mensagem: inicio=%d, tam=%d, seq=%d, tipo=%d, crc=%d\n", msg->inicio, msg->tam, msg->seq, msg->tipo, msg->crc);
+
 		//Enviar Buffer
 		write(socket,buffer,tam_buffer);
+
+        // Log após envio
+       // printf("Mensagem enviada, seq: %d\n", msg->seq);
+       // printf("\n");
+
 		free(buffer);
 	}else{
 		fprintf(stderr,"ERRO - Enviar MSG Vazia");
@@ -145,91 +159,63 @@ void envia_msg(int socket, protocolo *msg)
 
 //MUDAR A IMPLEMENTAÇÃO DO CRC, calcular em cima com o crc recebido e comparar com 0
 // n_msgs??
-protocolo* recebe_msg(int socket, int n_msgs) {
-    protocolo *msg;
-    uint8_t *buffer;
-    int i, tam_buffer;
+protocolo* recebe_msg(int socket, int timeout) {
+    protocolo *msg = NULL;
+    uint8_t buffer[67];  // Tamanho fixo de 67 bytes
+    memset(buffer, 0, sizeof(buffer));
 
-    // Tamanho fixo de 67 bytes
-    tam_buffer = 67;
-
-    // Aloca buffer
-    buffer = (uint8_t*)malloc(tam_buffer);
-    if (!buffer) {
-        fprintf(stderr, "Falha ao alocar buffer\n");
-        exit(-1);
-    }
-
-    // Aloca mensagem
-    msg = (protocolo*)malloc(sizeof(protocolo));
-    if (!msg) {
-        fprintf(stderr, "Falha ao alocar mensagem\n");
-        free(buffer);
-        exit(-1);
-    }
-
-    // Inicializa o buffer da mensagem
-    memset(buffer, 0, tam_buffer);
-    memset(msg, 0, sizeof(protocolo));
-
-    // Recebe mensagem e salva no buffer
-    int bytes_read = read(socket, buffer, tam_buffer);
-    if (bytes_read <= 0) {
-        free(buffer);
-        free(msg);
+    int bytes_read = read(socket, buffer, sizeof(buffer));
+    if (bytes_read <= 0) 
+    {
+        printf("Erro ao ler do socket ou conexão fechada (bytes_read: %d)\n", bytes_read);
         return NULL;
     }
 
+    printf("\n");
+    printf("Dentro da funcao recebe_msg\n");
+    printf("Bytes lidos do socket: %d\n", bytes_read);
+    printf("\n");
+
     if (buffer[0] == PACKET_START_MARKER) {
-        // Inicio
+        msg = (protocolo*)malloc(sizeof(protocolo));
+        if (!msg) {
+            fprintf(stderr, "Falha ao alocar mensagem\n");
+            exit(-1);
+        }
+        memset(msg, 0, sizeof(protocolo));
+
         msg->inicio = buffer[0];
-        // Tamanho
         msg->tam = (buffer[1] >> 2);
 
-        // Aloca vetor DADOS
         msg->dados = (uint8_t*)malloc(64);
         if (!msg->dados) {
             fprintf(stderr, "Falha ao alocar vetor de dados\n");
-            free(buffer);
             free(msg);
             exit(-1);
         }
         memset(msg->dados, 0, 64);
 
-        // Sequência
         msg->seq = (buffer[1] << 6);
-        msg->seq = (msg->seq >> 3); // Acessa os 3 bits mais significativos
+        msg->seq = (msg->seq >> 3); 
         msg->seq |= (buffer[2] >> 5);
 
-        // Tipo
         msg->tipo = (buffer[2] << 3);
         msg->tipo = (msg->tipo >> 3);
 
-        // Dados
-        for (i = 0; i < 64; i++) {
-            msg->dados[i] = buffer[i + 3];
-        }
+        memcpy(msg->dados, buffer + 3, 64);
 
-        // CRC
         uint8_t received_crc = buffer[bytes_read - 1];
         msg->crc = calc_crc8_with_table(buffer, bytes_read - 1);
 
-        // Verifica se o CRC recebido é válido
         if (msg->crc != received_crc) {
             fprintf(stderr, "ERRO: CRC inválido na mensagem recebida.\n");
             free(msg->dados);
             free(msg);
-            free(buffer);
             return NULL;
         }
 
-        // Libera buffer
-        free(buffer);
         return msg;
     } else {
-        // Lixo
-        free(buffer);
-        free(msg);
         return NULL;
     }
 }
@@ -288,6 +274,16 @@ void envia_pedido_lista(int socket)
     protocolo *lista_msg = cria_msg(0, LISTA, NULL, 0);
     envia_msg(socket, lista_msg);
     exclui_msg(lista_msg);
+}
+
+void envia_pedido_video(int socket, const char *nome_video) {
+    size_t len = strlen(nome_video);
+    uint8_t buffer[64] = {0}; // Buffer intermediário de tamanho fixo 64 bytes
+    memcpy(buffer, nome_video, len);
+    protocolo *pedido_msg = cria_msg(0, BAIXAR, buffer, len);
+    printf("Enviando pedido de video dentro da funcao envia_pedido_video: %s\n", nome_video);
+    envia_msg(socket, pedido_msg);
+    exclui_msg(pedido_msg);
 }
 
 void envia_ack(int socket, uint8_t seq) 

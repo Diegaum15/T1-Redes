@@ -112,6 +112,8 @@ void padding_dados(uint8_t *dados, size_t tam);
 // Função que envia um pedido de lista
 void envia_pedido_lista(int socket);
 
+void envia_pedido_video(int socket, const char *nome_video);
+
 // Função que envia uma mensagem de ACK
 void envia_ack(int socket, uint8_t seq);
 
