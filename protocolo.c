@@ -170,12 +170,7 @@ protocolo* recebe_msg(int socket, int timeout) {
         printf("Erro ao ler do socket ou conexão fechada (bytes_read: %d)\n", bytes_read);
         return NULL;
     }
-
-    printf("\n");
-    printf("Dentro da funcao recebe_msg\n");
-    printf("Bytes lidos do socket: %d\n", bytes_read);
-    printf("\n");
-
+    
     if (buffer[0] == PACKET_START_MARKER) {
         msg = (protocolo*)malloc(sizeof(protocolo));
         if (!msg) {

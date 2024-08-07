@@ -3,6 +3,17 @@
 #include "protocolo.h"
 #define SERVER_PORT 12347
 #define VIDEO_DIR "/home/diegaum/Redes/code/videos" // Caminho absoluto do diretório
+#include <signal.h>
+#include <setjmp.h>
+
+
+static jmp_buf env;
+
+// Definir um manipulador de sinal para SIGINT
+void handle_sigint(int sig) {
+    printf("\nInterrupção detectada. Retornando ao menu principal...\n");
+    longjmp(env, 1);
+}
 
 void interface_cliente(int socket, janela_deslizante *janela) 
 {
@@ -24,11 +35,11 @@ void interface_cliente(int socket, janela_deslizante *janela)
             case 2:
                 printf("Digite o nome do vídeo a ser baixado: ");
                 scanf("%s", video);
-                //cliente_manda_baixar(socket, video, janela);
                 pede_e_recebe_video(socket, video);
                 break;
             case 3:
                 printf("Saindo...\n");
+                printf("Para fazer uma interrupção digite ctrl c");
                 return;
             default:
                 printf("Opção inválida. Tente novamente.\n");
@@ -36,17 +47,27 @@ void interface_cliente(int socket, janela_deslizante *janela)
     }
 }
 
-//wlp0s20f3
 
-int main() 
-{
+int main(int argc, char *argv[]) {
+    signal(SIGINT, handle_sigint);
+
+    
     int rsocket;
-    char interface[] = "eth0"; // Interface de rede (loopback)
+    char interface[] = "lo"; // Interface de rede (loopback)
     rsocket = abrirRawSocket(interface);
     if (rsocket < 0) {
         fprintf(stderr, "Erro ao abrir socket RAW.\n");
         exit(1);
     }
+
+    if (setjmp(env) == 0) {
+        // Executa normalmente
+    } else {
+        // Executa após uma interrupção
+        printf("Retornando ao menu principal...\n");
+        envia_erro(rsocket,0);
+    }
+
 
     printf("Socket RAW aberto com sucesso na interface: %s\n", interface);
 
