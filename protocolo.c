@@ -18,34 +18,8 @@ uint8_t* aloca_vetor(int tam)
         fprintf(stderr, "Falha ao alocar vetor de uint8_t - Dados ou buffer\n");
         exit(-1);
     }
-    //dados[tam] = '\0'; // Adicionar terminador nulo no final dos dados
     memset(dados, 0, tam); // Inicializa o vetor alocado com zeros
     return dados;
-}
-
-protocolo* aloca_msg() 
-{
-    protocolo* msg = (protocolo*)malloc(sizeof(protocolo));
-    if (!msg) {
-        fprintf(stderr, "Falha ao alocar mensagem\n");
-        exit(-1);
-    }
-    memset(msg, 0, sizeof(protocolo)); // Inicializa a mensagem com zeros
-    return msg;
-}
-
-uint8_t cal_seq(protocolo *msg)
-{
-	uint8_t new_seq;
-	//5bit 0-31 seq
-	if(!msg)
-		return (0);
-	if(msg->seq < 31){
-		new_seq = msg->seq+1;
-	}else{
-		new_seq = 0;
-	}
-	return (new_seq);
 }
 
 protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam) 
@@ -130,26 +104,16 @@ void envia_msg(int socket, protocolo *msg)
 		for(i=0;i<64;i++){
 			buffer[3+i] = msg->dados[i];
 		}
-		//crc
-        //printf("Enviando mensagem: inicio=%d, tam=%d, seq=%d, tipo=%d, crc=%d\n", msg->inicio, msg->tam, msg->seq, msg->tipo, msg->crc);
-
+		
         // Calcular o CRC para os bytes relevantes da mensagem
         msg->crc = calc_crc8_with_table(buffer, tam_buffer - 1);
 
         // Incluir o valor do CRC no último byte do buffer
         buffer[tam_buffer - 1] = msg->crc;
 
-        // Log antes de enviar
-        //printf("\n");
-        //printf("Dentro da funcao envia_msg\n");
-        //printf("Enviando mensagem: inicio=%d, tam=%d, seq=%d, tipo=%d, crc=%d\n", msg->inicio, msg->tam, msg->seq, msg->tipo, msg->crc);
-
+       
 		//Enviar Buffer
 		write(socket,buffer,tam_buffer);
-
-        // Log após envio
-       // printf("Mensagem enviada, seq: %d\n", msg->seq);
-       // printf("\n");
 
 		free(buffer);
 	}else{
@@ -157,8 +121,6 @@ void envia_msg(int socket, protocolo *msg)
 	}
 }
 
-//MUDAR A IMPLEMENTAÇÃO DO CRC, calcular em cima com o crc recebido e comparar com 0
-// n_msgs??
 protocolo* recebe_msg(int socket, int timeout) {
     protocolo *msg = NULL;
     uint8_t buffer[67];  // Tamanho fixo de 67 bytes

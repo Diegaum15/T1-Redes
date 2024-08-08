@@ -24,10 +24,10 @@ crc.o: crc.c
 janela.o: janela.c
 	$(CC) -c $(FLAGS) janela.c
 
-client.o: client.c 
+client.o: client.c client.h
 	$(CC) -c $(FLAGS) client.c
 
-server.o: server.c
+server.o: server.c server.h
 	$(CC) -c $(FLAGS) server.c
 	
 clean:

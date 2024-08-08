@@ -64,24 +64,11 @@ typedef struct protocolo{
 
 #include "crc.h"
 
-typedef struct {
-	protocolo *buffer[MAX_JANELA]; // Mensagens na janela
-	int base;						 // Base da janela
-    int next_seq;					 // Próxima sequência a ser enviada
-    int tamanho;					 // Tamanho da janela
-} janela_deslizante;
-
 // Função para excluir uma mensagem
 void exclui_msg(protocolo *msg);
 
 // Função para alocar um vetor de tamanho tam
 uint8_t* aloca_vetor(int tam);
-
-// Função para alocar uma mensagem
-protocolo* aloca_msg();
-
-// Função para calcular a sequência
-uint8_t cal_seq(protocolo *msg);
 
 // Função para criar uma mensagem
 protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam);
@@ -111,6 +98,7 @@ void padding_dados(uint8_t *dados, size_t tam);
 // Função que envia um pedido de lista
 void envia_pedido_lista(int socket);
 
+// Função que envia um pedido de vídeo
 void envia_pedido_video(int socket, const char *nome_video);
 
 // Função que envia uma mensagem de ACK
