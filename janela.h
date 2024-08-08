@@ -5,8 +5,6 @@
 #include <signal.h>
 #include <setjmp.h>
 
-extern volatile sig_atomic_t interrompido;
-
 // Desliza uma janela, passa quem sera o ultimo da janela
 void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next);
 

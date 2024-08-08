@@ -1,16 +1,6 @@
 #include "raw_socket.h"
 #include "janela.h"
 #include "protocolo.h"
-#include <signal.h>
-#include <setjmp.h>
-
-static jmp_buf env;
-
-// Definir um manipulador de sinal para SIGINT
-void handle_sigint(int sig) {
-    printf("\nInterrupção detectada. Retornando ao menu principal...\n");
-    longjmp(env, 1);
-}
 
 void interface_cliente(int socket) 
 {
@@ -36,7 +26,6 @@ void interface_cliente(int socket)
                 break;
             case 3:
                 printf("Saindo...\n");
-                printf("Para fazer uma interrupção digite ctrl c");
                 return;
             default:
                 printf("Opção inválida. Tente novamente.\n");
@@ -44,9 +33,7 @@ void interface_cliente(int socket)
     }
 }
 
-
 int main(int argc, char *argv[]) {
-    signal(SIGINT, handle_sigint);
 
     int rsocket;
     char interface[] = "eth0"; // Interface de rede (loopback)
@@ -54,14 +41,6 @@ int main(int argc, char *argv[]) {
     if (rsocket < 0) {
         fprintf(stderr, "Erro ao abrir socket RAW.\n");
         exit(1);
-    }
-
-    if (setjmp(env) == 0) {
-        // Executa normalmente
-    } else {
-        // Executa após uma interrupção
-        printf("Retornando ao menu principal...\n");
-        envia_erro(rsocket,0);
     }
 
     printf("Socket RAW aberto com sucesso na interface: %s\n", interface);

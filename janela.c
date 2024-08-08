@@ -1,7 +1,4 @@
 #include "janela.h"
-static jmp_buf env;
-
-volatile sig_atomic_t interrompido;
 
 void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next)
 {
@@ -43,8 +40,10 @@ void pede_e_recebe_lista(int socket) {
                     // enquanto nao acabar a transmissao
                     while (resposta == NULL || resposta->tipo != FTX) {
                         if (resposta != NULL && resposta->inicio == PACKET_START_MARKER && (resposta->tipo == MOSTRA_TELA || resposta->tipo == FTX)){
-                            if (resposta->tipo == ERRO)
+                            if (resposta->tipo == ERRO){
                                 cuidar_erro(resposta);
+                                return;
+                            }
 
                             if (resposta->seq == (seq_esperado%32) && resposta->tipo == MOSTRA_TELA) {
                                 janela[0] = resposta; // 0 eh a resposta
@@ -118,18 +117,20 @@ void pede_e_recebe_lista(int socket) {
                             break;
                         }
                     }
-                
+
+                    for(int y = 0 ; y < seq_esperado; y++){
+                        printf("lista[%d] = %s\n",y, lista[y]);
+                    }
+
                     exclui_janela(janela);
                     exclui_lista(lista, seq_esperado);
                     printf("conexão encerrada\n");
                     return;
                 } else {
                     if (resposta->tipo == NACK) {
-                        printf("recebeu NACK\n");
                         tentativas++;
                     }
                     if (resposta->tipo == ERRO) {
-                        printf("recebeu ERRO\n");
                         tentativas++;
                     }
                 }
@@ -143,10 +144,11 @@ void pede_e_recebe_lista(int socket) {
 void pede_e_recebe_video(int socket, const char *nome_video) {
     int tentativas = 0;
     int seq_esperado = 0;
+    size_t tamanho = 0;
     protocolo *resposta = NULL;
     protocolo *janela[MAX_JANELA];
     memset(janela, 0, MAX_JANELA * sizeof(protocolo*));
-    FILE *video_file = fopen("received_video.mp4", "wb"); // Salva o vídeo com um nome fixo para depuração
+    FILE *video_file = fopen(nome_video, "wb");
     if (!video_file) {
         printf("Erro ao abrir arquivo de vídeo para escrita\n");
         return;
@@ -169,26 +171,48 @@ void pede_e_recebe_video(int socket, const char *nome_video) {
                         espera(socket, -1);
                         resposta = recebe_msg(socket, 1);
                         if (resposta != NULL && resposta->inicio == PACKET_START_MARKER && resposta->tipo == DESCRITOR_ARQUIVO) {
+                            sscanf((char*)resposta->dados, "tamanho=%ld", &tamanho);
+                            tamanho = tamanho / PACKET_DATA_MAX_SIZE+1;
                         } else {
                             exclui_msg(resposta);
                             fclose(video_file);
                             return;
                         }
-                    } 
+                    }
+                    else{
+                        if (resposta != NULL && resposta->inicio == PACKET_START_MARKER && resposta->tipo == DESCRITOR_ARQUIVO) {
+                            sscanf((char*)resposta->dados, "tamanho=%ld", &tamanho);
+                            tamanho = tamanho / PACKET_DATA_MAX_SIZE+1;
+                        }
+                    }
 
                     tentativas = 0;
 
                     while (resposta == NULL || resposta->tipo != FTX) 
                     {
-                        if (sigsetjmp(env, 1) != 0) {
-                            printf("Interrupção durante a recepção do vídeo. Voltando ao menu principal.\n");
-                            fclose(video_file);
-                            return;
+
+                        printf("\033[H\033[J");
+                        printf("Baixando Vídeo:\n");
+                        printf("Progresso %ld%%...\n", (seq_esperado*100/tamanho)); 
+
+                        fflush(stdout);
+
+                        if (espera(STDIN_FILENO, 0) == 0){
+                            char buffer[1024];
+                            ssize_t bytesRead = read(STDIN_FILENO, buffer, sizeof(buffer));
+                            if (bytesRead > 0) {
+                                buffer[bytesRead] = '\0';  // Null-terminate the string
+                                if (strcmp(buffer, "exit\n") == 0 || strcmp(buffer, "sair\n") == 0) {
+                                    envia_erro(socket, 0); // Envia erro para o server
+                                    printf("Voltando para o menu...\n");
+                                    return;
+                                } else {
+                                    printf("Você digitou: %s\n", buffer);
+                                }
+                            }
                         }
 
                         if (resposta != NULL && resposta->inicio == PACKET_START_MARKER && (resposta->tipo == DADOS || resposta->tipo == FTX)) {
-                            if (resposta->tipo == ERRO)
-                                cuidar_erro(resposta);
 
                             if (resposta->seq == (seq_esperado % 32) && resposta->tipo == DADOS) {
                                 janela[0] = resposta; // 0 é a resposta
@@ -215,21 +239,59 @@ void pede_e_recebe_video(int socket, const char *nome_video) {
                             }
                         } else {
                             if (resposta != NULL) {
+                                if (resposta->tipo == ERRO){
+                                    cuidar_erro(resposta);
+                                    return;
+                                }
                                 exclui_msg(resposta);
                             }
                         }
                         resposta = recebe_msg(socket, 1);
                     }
 
+                    envia_ack(socket, 0);
+
+                    tentativas = 0;
+                    int acabou = 0;
+                    //espera 2 sec, se receber FTX denovo, retorna ack (limite de 16 retornos)
+                    while (acabou == 0){
+                        protocolo *resposta;
+                        if (tentativas == 16){
+                            acabou = 1;
+                            break;
+                        }
+                        if (espera(socket, 2) == 0){ //se recebeu ftx denovo
+                            resposta = recebe_msg(socket, 1);
+                            if (resposta != NULL && resposta->inicio == PACKET_START_MARKER && resposta->tipo == FTX){
+                                envia_ack(socket, 0);
+                                tentativas++;
+                            }
+                            exclui_msg(resposta);
+                        } else{
+                            acabou = 1;
+                            break;
+                        }
+                    }
+
                     exclui_janela(janela);
+                    printf("conexão encerrada\n");
                     fclose(video_file);
                     return;
+                }
+                else {
+                    if (resposta->tipo == NACK) {
+                        tentativas++;
+                    }
+                    if (resposta->tipo == ERRO) {
+                        tentativas++;
+                    }
                 }
             } 
         }
     }
-
+    printf("Conexão falhou depois de %d tentativas (timeout)\n", tentativas);
     fclose(video_file);
+    return;
 }
 
 void processa_pedido_video(int socket, const char *filename) {
@@ -284,11 +346,26 @@ void processa_pedido_video(int socket, const char *filename) {
     int seq_ultimo = tamanho / PACKET_DATA_MAX_SIZE+1;
 
     while (acabou == 0) {
-        if (interrompido) { // Verifica se houve interrupção
-            printf("Interrupção detectada. Encerrando envio...\n");
-            close(fd);
-            envia_erro(socket, 0x02); // Opcional: Envia erro para o cliente informando a interrupção
-            return;
+
+        printf("\033[H\033[J");
+        printf("Enviando Vídeo:\n");
+        printf("Progresso %d%%...\n", (fim_janela*100/seq_ultimo));
+
+        fflush(stdout);
+
+        if (espera(STDIN_FILENO, 0) == 0){
+            char buffer[1024];
+            ssize_t bytesRead = read(STDIN_FILENO, buffer, sizeof(buffer));
+            if (bytesRead > 0) {
+                buffer[bytesRead] = '\0';  // Null-terminate the string
+                if (strcmp(buffer, "exit\n") == 0 || strcmp(buffer, "sair\n") == 0) {
+                    envia_erro(socket, 0); // Envia erro para o cliente
+                    printf("Voltando para o menu...\n");
+                    return;
+                } else {
+                    printf("Você digitou: %s\n", buffer);
+                }
+            }
         }
 
         if (i == fim_janela + 1) { //mais 1 para mandar o ultimo
@@ -310,12 +387,6 @@ void processa_pedido_video(int socket, const char *filename) {
             tempo = 1;
 
         while (espera(socket, tempo) == 0) { // Se chegou um pacote
-            if (interrompido) { // Verifica se houve interrupção
-                printf("Interrupção detectada. Encerrando envio...\n");
-                close(fd);
-                envia_erro(socket, 0x02); // Opcional: Envia erro para o cliente informando a interrupção
-                return;
-            }
 
             tentativas = 0;
             protocolo *resposta = recebe_msg(socket, 1);
@@ -364,6 +435,7 @@ void processa_pedido_video(int socket, const char *filename) {
                 i = inicio_janela - 1;
             } else if (resposta->tipo == ERRO) {
                 cuidar_erro(resposta);
+                return;
             }
             exclui_msg(resposta);
         }
@@ -375,13 +447,6 @@ void processa_pedido_video(int socket, const char *filename) {
     tentativas = 0;
     acabou = 0;
     while (acabou == 0) {
-        if (interrompido) { // Verifica se houve interrupção
-            printf("Interrupção detectada. Encerrando envio...\n");
-            close(fd);
-            envia_erro(socket, 0x02); // Opcional: Envia erro para o cliente informando a interrupção
-            return;
-        }
-
         protocolo *resposta;
         if (tentativas == 16) {
             acabou = 1;
@@ -397,6 +462,7 @@ void processa_pedido_video(int socket, const char *filename) {
                 exclui_msg(resposta);
                 break;
             }
+            tentativas++;
         }
     }
 
@@ -554,6 +620,7 @@ void lista_arquivos(int socket) {
                 i = inicio_janela-1;
             } else if (resposta->tipo == ERRO) {
                 cuidar_erro(resposta);
+                return;
             }
             exclui_msg(resposta);
         }
@@ -639,22 +706,22 @@ void cuidar_erro(protocolo *msg){
             //printf(ERRO_ACESSO_NEGADO);
             printf("Erro no acesso ao arquivo\n");
             exclui_msg(msg);
-            exit(1);
+            // exit(1);
             break;
         case 2:
             printf(ERRO_NAO_ENCONTRADO);
             exclui_msg(msg);
-            exit(2);
+            // exit(2);
             break;
         case 3:
             printf(ERRO_DISCO_CHEIO);
             exclui_msg(msg);
-            exit(3);
+            // exit(3);
             break;
         default:
             printf(ERRO_PADRAO);
             exclui_msg(msg);
-            exit(4);
+            // exit(4);
             break;
         }
     }

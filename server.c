@@ -5,14 +5,6 @@
 #include <signal.h>
 #include <setjmp.h>
 
-volatile sig_atomic_t interrompido = 0; // Variável global para sinal de interrupção
-jmp_buf env;
-
-void handle_sigint_server(int sig) {
-    interrompido = 1;
-    longjmp(env, 1); // Volta para o ponto em que setjmp foi chamado
-}
-
 int main() 
 {
     int rsocket;
