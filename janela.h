@@ -1,13 +1,11 @@
 #ifndef JANELA_H
 #define JANELA_H
 #include "protocolo.h"
-#include <linux/if_packet.h>
-#include <dirent.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <signal.h>
+#include <setjmp.h>
 
-// Inicializa a estrutura da janela deslizante
-void inicializa_janela(janela_deslizante *janela);
+extern volatile sig_atomic_t interrompido;
 
 // Desliza uma janela, passa quem sera o ultimo da janela
 void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next);
@@ -17,14 +15,8 @@ void pede_e_recebe_lista(int socket);
 
 void pede_e_recebe_video(int socket, const char *nome_video);
 
-// Função que baixa um arquivo do servidor
-void baixa_arquivo(int socket, const char *filename, janela_deslizante *janela);
-
 // Funcao que abre um video
 void abre_video(const char *filename);
-
-// Função que envia uma mensagem de pedido de download de um arquivo
-void cliente_manda_baixar(int socket, const char *video, janela_deslizante *janela);
 
 // Funcao para listar arquivos de vídeo no diretório
 void lista_arquivos(int socket);

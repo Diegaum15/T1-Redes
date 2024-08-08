@@ -1,27 +1,7 @@
 #include "janela.h"
-#include <signal.h>
-#include <setjmp.h>
-#define VIDEO_DIR "/home/diegaum/Redes/code/videos" // Caminho absoluto do diretório // Diretório onde os vídeos estão armazenados
 static jmp_buf env;
 
 volatile sig_atomic_t interrompido;
-
-
-// Inicializa a estrutura da janela deslizante
-void inicializa_janela(janela_deslizante *janela) 
-{
-    // Inicializa a base da janela como 0 (primeiro índice do vetor)
-    janela->base = 0;
-
-    // Inicializa o índice da próxima mensagem a ser enviada como 0
-    janela->next_seq = 0;
-
-    // Inicializa todos os elementos do vetor de mensagens como NULL
-    for (int i = 0; i < MAX_JANELA; i++) 
-    {
-        janela->buffer[i] = NULL;
-    }
-}
 
 void desliza_janela(protocolo *janela[MAX_JANELA], protocolo *next)
 {
@@ -642,11 +622,6 @@ void processa_mensagem_cliente(int socket, protocolo *msg)
         case FTX:
             printf("FTX recebido\n\n");
             // Processa FTX conforme necessário
-            break;
-        
-        case ENCERRAMENTO: 
-            printf("Recebido sinal de encerramento do cliente.\n");
-            interrompido = 1; // Define a flag para sair do loop
             break;
         
         case ERRO:

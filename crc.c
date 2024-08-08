@@ -58,32 +58,3 @@ uint8_t gencrc(uint8_t *data, size_t len)
     }
     return crc;
 }
-
-/*
-// Função principal para testar e comparar as funções de CRC
-int main() {
-    // Dados de teste em hexadecimal
-    uint8_t data[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
-
-    // Estrutura de teste
-    protocolo test_msg;
-    test_msg.inicio = 0x7E; // PACKET_START_MARKER
-    test_msg.tam = 5;
-    test_msg.seq = 1;
-    test_msg.tipo = 0x12; // Exemplo tipo
-    memcpy(test_msg.dados, data, 5);
-    test_msg.crc = 0;
-
-    // Calcular CRC usando diferentes funções
-    uint8_t crc_table = calc_crc8_with_table(data, 5);
-    uint8_t crc_struct = calc_crc8(&test_msg);
-    uint8_t crc_bitwise = gencrc(data, 5);
-
-    // Imprimir os resultados
-    printf("CRC usando tabela de lookup: 0x%02X\n", crc_table);
-    printf("CRC para estrutura protocolo: 0x%02X\n", crc_struct);
-    printf("CRC bit a bit: 0x%02X\n", crc_bitwise);
-
-    return 0;
-}
-*/

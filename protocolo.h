@@ -11,7 +11,6 @@
 #include <sys/ioctl.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
-#include <linux/if.h>
 #include <linux/if_packet.h>
 #include <linux/if_ether.h>
 #include <inttypes.h>
@@ -20,8 +19,13 @@
 #include <dirent.h>
 #include <errno.h>
 #include <time.h>
-#include "raw_socket.h"
 #include <arpa/inet.h>
+#include <stdint.h>
+#include <net/if.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <limits.h>
+#include "raw_socket.h"
 
 #define MAX_JANELA 5
 
@@ -59,11 +63,6 @@ typedef struct protocolo{
 }protocolo;
 
 #include "crc.h"
-
-typedef struct controle{
-	char tipo;
-	char interface[10];
-}controle;
 
 typedef struct {
 	protocolo *buffer[MAX_JANELA]; // Mensagens na janela
