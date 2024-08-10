@@ -48,7 +48,7 @@ void processa_pedido_video(int socket, const char *filename) {
     printf("Recebendo pedido de vídeo\n");
 
     char filepath[256];
-    snprintf(filepath, sizeof(filepath), "/home/diegaum/Redes/code/videos/%s", filename);
+    snprintf(filepath, sizeof(filepath), "./videos/%s", filename);
 
     int fd = open(filepath, O_RDONLY);
     if (fd == -1) {
@@ -100,6 +100,7 @@ void processa_pedido_video(int socket, const char *filename) {
         printf("\033[H\033[J");
         printf("Enviando Vídeo:\n");
         printf("Progresso %d%%...\n", (fim_janela*100/seq_ultimo));
+        printf("Digite \"exit\" ou \"sair\" para cancelar\n"); 
 
         fflush(stdout);
 
@@ -215,9 +216,7 @@ void processa_pedido_video(int socket, const char *filename) {
             tentativas++;
         }
     }
-
     
-    abre_video(filepath);
     printf("Conexão encerrada\n");
     exclui_janela(janela);
     close(fd); // Certifique-se de fechar o arquivo ao final
@@ -404,7 +403,7 @@ void lista_arquivos(int socket) {
 int main() 
 {
     int rsocket;
-    char interface[] = "lo"; // Interface de rede (loopback)
+    char interface[] = "eth0"; // Interface de rede (loopback)
     rsocket = abrirRawSocket(interface);
     if (rsocket < 0) {
         fprintf(stderr, "Erro ao abrir socket RAW.\n");

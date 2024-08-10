@@ -15,13 +15,13 @@ server: $(OBJS) server.o
 protocolo.o: protocolo.c protocolo.h
 	$(CC) -c $(FLAGS) protocolo.c
 
-raw_socket.o: raw_socket.c 
+raw_socket.o: raw_socket.c raw_socket.h
 	$(CC) -c $(FLAGS) raw_socket.c
 
-crc.o: crc.c
+crc.o: crc.c crc.h
 	$(CC) -c $(FLAGS) crc.c
 
-janela.o: janela.c
+janela.o: janela.c janela.h
 	$(CC) -c $(FLAGS) janela.c
 
 client.o: client.c client.h

@@ -42,6 +42,16 @@ protocolo* cria_msg(uint8_t seq, uint8_t tipo, const uint8_t *dados, size_t tam)
         memcpy(msg->dados, dados, tam);
     padding_dados(msg->dados, tam);
 
+    //testa por identificadores de VLAN ou MPLS
+    if ((msg->dados[9] == 0x88 && msg->dados[10] == 0xa8) ||
+        (msg->dados[9] == 0x81 && msg->dados[10] == 0x00)){
+        msg->dados[9] = msg->dados[9] & 0x7F;
+        if (tipo == DADOS)
+            msg->tipo = DROPPED;
+        if (tipo == MOSTRA_TELA)
+            msg->tipo = DROPPED_MOSTRA;
+    }
+
     msg->crc = 0;
     return msg;
 }
@@ -160,6 +170,17 @@ protocolo* recebe_msg(int socket, int timeout) {
         msg->tipo = (msg->tipo >> 3);
 
         memcpy(msg->dados, buffer + 3, 64);
+
+        if (msg->tipo == DROPPED){
+            msg->tipo = DADOS;
+            msg->dados[9] = msg->dados[9] | 0x80;
+        }
+        if (msg->tipo == DROPPED_MOSTRA){
+            msg->tipo = MOSTRA_TELA;
+            msg->dados[9] = msg->dados[9] | 0x80;
+        }
+
+        
 
         uint8_t received_crc = buffer[bytes_read - 1];
         msg->crc = calc_crc8_with_table(buffer, bytes_read - 1);

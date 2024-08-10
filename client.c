@@ -141,11 +141,6 @@ void pede_e_recebe_video(int socket, const char *nome_video) {
     protocolo *resposta = NULL;
     protocolo *janela[MAX_JANELA];
     memset(janela, 0, MAX_JANELA * sizeof(protocolo*));
-    FILE *video_file = fopen(nome_video, "wb");
-    if (!video_file) {
-        printf("Erro ao abrir arquivo de vídeo para escrita\n");
-        return;
-    }
 
     // Envia pedido de vídeo
     envia_pedido_video(socket, nome_video); // Função adaptada para enviar tipo "BAIXAR"
@@ -159,6 +154,11 @@ void pede_e_recebe_video(int socket, const char *nome_video) {
             resposta = recebe_msg(socket, 1);
             if (resposta != NULL && resposta->inicio == PACKET_START_MARKER) {
                 if (resposta->tipo == ACK || resposta->tipo == DESCRITOR_ARQUIVO) {
+                    FILE *video_file = fopen(nome_video, "wb");
+                    if (!video_file) {
+                        printf("Erro ao abrir arquivo de vídeo para escrita\n");
+                        return;
+                    }
                     if (resposta->tipo == ACK) {
                         exclui_msg(resposta);
                         espera(socket, -1);
@@ -186,7 +186,8 @@ void pede_e_recebe_video(int socket, const char *nome_video) {
 
                         printf("\033[H\033[J");
                         printf("Baixando Vídeo:\n");
-                        printf("Progresso %ld%%...\n", (seq_esperado*100/tamanho)); 
+                        printf("Progresso %ld%%...\n", (seq_esperado*100/tamanho));
+                        printf("Digite \"exit\" ou \"sair\" para cancelar\n"); 
 
                         fflush(stdout);
 
@@ -266,6 +267,7 @@ void pede_e_recebe_video(int socket, const char *nome_video) {
                         }
                     }
 
+                    abre_video(nome_video);
                     exclui_janela(janela);
                     printf("conexão encerrada\n");
                     fclose(video_file);
@@ -283,7 +285,6 @@ void pede_e_recebe_video(int socket, const char *nome_video) {
         }
     }
     printf("Conexão falhou depois de %d tentativas (timeout)\n", tentativas);
-    fclose(video_file);
     return;
 }
 
@@ -322,7 +323,7 @@ void interface_cliente(int socket)
 int main(int argc, char *argv[]) {
 
     int rsocket;
-    char interface[] = "lo"; // Interface de rede (loopback)
+    char interface[] = "eth0"; // Interface de rede (loopback)
     rsocket = abrirRawSocket(interface);
     if (rsocket < 0) {
         fprintf(stderr, "Erro ao abrir socket RAW.\n");
