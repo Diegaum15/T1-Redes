@@ -93,6 +93,7 @@ void processa_pedido_video(int socket, const char *filename) {
     int voltas = 0;
     int ultimo = 0;
     int tentativas = 0;
+    int tempo = 0;
     int seq_ultimo = tamanho / PACKET_DATA_MAX_SIZE+1;
 
     while (acabou == 0) {
@@ -133,7 +134,6 @@ void processa_pedido_video(int socket, const char *filename) {
         ultimo = fim_janela > MAX_JANELA-1 ? fim_janela: MAX_JANELA-1;
         envia_msg(socket, janela[(i+(MAX_JANELA-1))-ultimo]);
 
-        int tempo = 0;
         if (tentativas == 9) //se janela deu 10 voltas sem receber, espera 1 seg para receber
             tempo = 1;
 
@@ -291,6 +291,7 @@ void lista_arquivos(int socket) {
     int acabou = 0;
     int voltas = 0;
     int tentativas = 0;
+    int tempo = 0;
     // Se tem menos arquivos que o tamanho da janela, já inicia menor
     int fim_janela = qnt_arquivos > MAX_JANELA - 1 ? MAX_JANELA - 1 : qnt_arquivos - 1;
     while (acabou == 0){
@@ -307,7 +308,6 @@ void lista_arquivos(int socket) {
         int ultimo = fim_janela > MAX_JANELA-1 ? fim_janela: MAX_JANELA-1;
         envia_msg(socket, janela[(i+(MAX_JANELA-1))-ultimo]);
 
-        int tempo = 0;
         if (tentativas == 9) //se janela deu 10 voltas sem receber, espera 1 seg para receber
             tempo = 1;
         while (espera(socket, tempo) == 0) { // Se chegou um pacote
